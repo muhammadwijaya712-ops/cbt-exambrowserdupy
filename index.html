@@ -1,0 +1,3239 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>EduShield CBT — Sistem Ujian Online Terproteksi</title>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+        }
+      }
+    };
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Supabase JS v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- JSZip untuk Generate Template Microsoft Word (.docx) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <!-- Mammoth.js untuk Parsing File Microsoft Word (.docx) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+
+  <!-- SheetJS XLSX untuk Export Rekap Nilai Excel (.xlsx) -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+  <style>
+    /* Scrollbar rapi & proteksi seleksi teks saat mode ujian aktif */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .exam-no-select {
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
+
+  <!-- Container Notifikasi Toast (Non-blocking pengganti alert()) -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+  <!-- Header Navigasi Utama -->
+  <header class="sticky top-0 z-40 bg-slate-900 text-white border-b border-slate-800 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+          <i data-lucide="shield-check" class="w-6 h-6 text-white"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-extrabold text-base sm:text-lg tracking-tight text-white">EduShield CBT</span>
+            <span id="connection-badge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+              Memeriksa Koneksi...
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Sistem Ujian Online Sekolah Terintegrasi Supabase</p>
+        </div>
+      </div>
+
+      <!-- Aksi Header Dinamis (Pengaturan Koneksi / Profil & Logout) -->
+      <div id="header-actions" class="flex items-center gap-2 flex-wrap"></div>
+    </div>
+  </header>
+
+  <!-- Konten Utama Aplikasi -->
+  <main id="app-root" class="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div class="flex flex-col items-center justify-center py-20 text-slate-500">
+      <div class="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+      <p class="text-sm font-medium">Memuat sistem EduShield CBT...</p>
+    </div>
+  </main>
+
+  <!-- Modal Pengaturan Koneksi Supabase -->
+  <div id="supabase-config-modal" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"></div>
+
+  <!-- Modal Konfirmasi Kustom (Pengganti confirm()) -->
+  <div id="confirm-modal" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4"></div>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 py-4 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+      <p>EduShield CBT — Sistem Ujian Online Terproteksi &amp; Bank Soal Digital</p>
+      <p class="font-medium text-slate-600">
+        Arsitektur: <span class="text-indigo-600 font-semibold">Supabase RLS + Realtime + RPC Grading</span>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    /**
+     * ============================================================================
+     * 1. KONFIGURASI SUPABASE (ISI MANUAL SEBELUM DEPLOY ATAU LEWAT MODAL UI)
+     * ============================================================================
+     */
+    const DEFAULT_SUPABASE_URL = "https://obdilkmyewfxrwfoicov.supabase.co";
+    const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_VA-8HLuqFNrbaKatDPqutQ_feySBhUK";
+
+    let supabaseClient = null;
+    let realtimeChannel = null;
+    let countdownInterval = null;
+    let blurLockTimeout = null;
+
+    function getSupabaseCredentials() {
+      const savedUrl = (localStorage.getItem('sb_url') || '').trim();
+      const savedKey = (localStorage.getItem('sb_key') || '').trim();
+      const url = savedUrl || DEFAULT_SUPABASE_URL.trim();
+      const key = savedKey || DEFAULT_SUPABASE_ANON_KEY.trim();
+      return { url, key, isFromLocalStorage: Boolean(savedUrl && savedKey) };
+    }
+
+    function initSupabaseClient() {
+      const { url, key } = getSupabaseCredentials();
+      if (!url || !key || !window.supabase) {
+        supabaseClient = null;
+        updateConnectionBadge(false);
+        return false;
+      }
+      try {
+        supabaseClient = window.supabase.createClient(url, key, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true
+          }
+        });
+        updateConnectionBadge(true);
+        return true;
+      } catch (err) {
+        console.error('Gagal inisialisasi Supabase:', err);
+        supabaseClient = null;
+        updateConnectionBadge(false);
+        return false;
+      }
+    }
+
+    function updateConnectionBadge(isConfigured) {
+      const badge = document.getElementById('connection-badge');
+      if (!badge) return;
+      if (isConfigured) {
+        badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+        badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Supabase Terhubung`;
+      } else {
+        badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30';
+        badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>Belum Dikonfigurasi`;
+      }
+    }
+
+    /**
+     * ============================================================================
+     * 2. STATE TERPUSAT APLIKASI
+     * ============================================================================
+     */
+    const state = {
+      screen: 'login', // 'login' | 'role_blocked' | 'teacher' | 'student'
+      loading: false,
+      authUser: null,
+      profile: null, // { id, nama_lengkap, username, role, kelas_atau_mapel }
+
+      // State Login
+      loginError: '',
+      loginSubmitting: false,
+
+      // State Dashboard Guru
+      teacher: {
+        activeTab: 'questions', // 'questions' | 'monitoring' | 'grades'
+        exams: [],
+        selectedExamId: null,
+        showCreateExamForm: false,
+        creatingExam: false,
+
+        // Tab 1: Bank Soal & Word Import
+        questions: [],
+        loadingQuestions: false,
+        showManualForm: false,
+        savingManualQuestion: false,
+        wordPreview: {
+          fileName: '',
+          items: [], // { tempId, pertanyaan, gambar_url, opsi_a, opsi_b, opsi_c, opsi_d, kunci_jawaban, bobot }
+          uploadingImages: false,
+          savingToDb: false
+        },
+
+        // Tab 2: Monitoring Realtime
+        sessions: [], // joined with profiles & answerCounts
+        loadingSessions: false,
+        monitoringFilter: 'ALL'
+      },
+
+      // State Portal Siswa
+      student: {
+        step: 'select_exam', // 'select_exam' | 'exam' | 'locked' | 'finished'
+        activeExams: [],
+        existingSessionsMap: {}, // exam_id -> session
+        loadingExams: false,
+
+        selectedExam: null,
+        session: null,
+        questions: [], // dari view student_questions (tanpa kunci_jawaban)
+        answersMap: {}, // question_id -> 'A'|'B'|'C'|'D'
+        doubtfulMap: {}, // question_id -> boolean
+        currentIndex: 0,
+        remainingSeconds: 0,
+        savingAnswerId: null,
+        lastSavedText: '',
+        submittingExam: false,
+        finalGradeResult: null
+      }
+    };
+
+    /**
+     * ============================================================================
+     * 3. UTILITAS UMUM, TOAST & MODAL KONFIRMASI
+     * ============================================================================
+     */
+    function escapeHTML(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function escapeXML(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+    }
+
+    function generateRandomToken(length = 6) {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let result = '';
+      for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return result;
+    }
+
+    function formatCountdown(totalSec) {
+      const s = Math.max(0, Math.floor(totalSec));
+      const hrs = Math.floor(s / 3600);
+      const mins = Math.floor((s % 3600) / 60);
+      const secs = s % 60;
+      if (hrs > 0) {
+        return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      }
+      return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function formatDateTimeID(isoString) {
+      if (!isoString) return '-';
+      try {
+        const d = new Date(isoString);
+        return d.toLocaleString('id-ID', {
+          day: '2-digit',
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch (e) {
+        return isoString;
+      }
+    }
+
+    // Mengacak urutan soal secara konsisten berdasarkan seed (siswa_id + exam_id)
+    function deterministicShuffle(array, seedStr) {
+      const arr = [...array];
+      let hash = 2166136261;
+      for (let i = 0; i < seedStr.length; i++) {
+        hash ^= seedStr.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+      const nextRand = () => {
+        hash += 0x6D2B79F5;
+        let t = Math.imul(hash ^ (hash >>> 15), 1 | hash);
+        t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(nextRand() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+
+      const styles = {
+        success: 'bg-emerald-900/95 text-white border-emerald-500/40',
+        error: 'bg-rose-900/95 text-white border-rose-500/40',
+        warning: 'bg-amber-900/95 text-white border-amber-500/40',
+        info: 'bg-slate-900/95 text-white border-indigo-500/40'
+      };
+      const icons = {
+        success: 'check-circle-2',
+        error: 'alert-octagon',
+        warning: 'alert-triangle',
+        info: 'info'
+      };
+      const iconColors = {
+        success: 'text-emerald-400',
+        error: 'text-rose-400',
+        warning: 'text-amber-400',
+        info: 'text-indigo-400'
+      };
+
+      const el = document.createElement('div');
+      el.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border shadow-xl backdrop-blur-md text-xs sm:text-sm font-medium transition-all duration-300 translate-y-2 opacity-0 ${styles[type] || styles.info}`;
+      el.innerHTML = `<i data-lucide="${icons[type] || 'info'}" class="w-5 h-5 shrink-0 ${iconColors[type] || 'text-indigo-400'}"></i><span>${escapeHTML(message)}</span>`;
+      container.appendChild(el);
+      if (window.lucide) lucide.createIcons();
+
+      requestAnimationFrame(() => el.classList.remove('translate-y-2', 'opacity-0'));
+      setTimeout(() => {
+        el.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => el.remove(), 300);
+      }, 3800);
+    }
+
+    // Modal Konfirmasi Kustom (Pengganti confirm() bawaan browser)
+    function openConfirmModal({ title, message, confirmLabel = 'Ya, Lanjutkan', confirmClass = 'bg-indigo-600 hover:bg-indigo-700', onConfirm }) {
+      const modal = document.getElementById('confirm-modal');
+      if (!modal) return;
+
+      modal.classList.remove('hidden');
+      modal.innerHTML = `
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+          <h3 class="text-lg font-bold text-slate-900 mb-2">${escapeHTML(title)}</h3>
+          <p class="text-xs sm:text-sm text-slate-600 leading-relaxed mb-6">${escapeHTML(message)}</p>
+          <div class="flex items-center justify-end gap-2.5">
+            <button
+              type="button"
+              id="confirm-modal-cancel"
+              class="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-semibold text-xs sm:text-sm hover:bg-slate-50 cursor-pointer"
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              id="confirm-modal-ok"
+              class="px-4 py-2.5 rounded-xl text-white font-bold text-xs sm:text-sm shadow-sm cursor-pointer ${confirmClass}"
+            >
+              ${escapeHTML(confirmLabel)}
+            </button>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('confirm-modal-cancel').onclick = () => {
+        modal.classList.add('hidden');
+      };
+      document.getElementById('confirm-modal-ok').onclick = async () => {
+        modal.classList.add('hidden');
+        if (typeof onConfirm === 'function') {
+          await onConfirm();
+        }
+      };
+    }
+
+    function copyTextSafe(text) {
+      const inp = document.createElement('input');
+      inp.value = text;
+      document.body.appendChild(inp);
+      inp.select();
+      try {
+        document.execCommand('copy');
+        showToast(`Disalin ke clipboard: ${text}`, 'info');
+      } catch (e) {
+        showToast(`Kode: ${text}`, 'info');
+      }
+      document.body.removeChild(inp);
+    }
+
+    /**
+     * ============================================================================
+     * 4. MODAL PENGATURAN KONEKSI SUPABASE
+     * ============================================================================
+     */
+    function openSupabaseConfigModal() {
+      const modal = document.getElementById('supabase-config-modal');
+      if (!modal) return;
+
+      const { url, key } = getSupabaseCredentials();
+      modal.classList.remove('hidden');
+      modal.innerHTML = `
+        <div class="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden">
+          <div class="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="database" class="w-5 h-5 text-emerald-400"></i>
+              <h3 class="text-base font-bold">Pengaturan Koneksi Supabase</h3>
+            </div>
+            <button type="button" onclick="closeSupabaseConfigModal()" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <form onsubmit="saveSupabaseConfig(event)" class="p-6 space-y-4">
+            <div class="p-3.5 rounded-xl bg-indigo-50 border border-indigo-200 text-xs text-indigo-900 leading-relaxed">
+              Ambil <strong>Project URL</strong> dan <strong>anon public key</strong> dari dashboard proyek Supabase Anda di menu <em>Project Settings &rarr; API</em>. Data disimpan secara aman di <code class="font-mono bg-white px-1 rounded">localStorage</code> browser ini.
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                Supabase Project URL
+              </label>
+              <input
+                type="url"
+                name="sbUrl"
+                required
+                value="${escapeHTML(url)}"
+                placeholder="https://xxxxxxxxxxxx.supabase.co"
+                class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 font-mono text-xs sm:text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                Supabase Anon Public Key
+              </label>
+              <textarea
+                name="sbKey"
+                rows="3"
+                required
+                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 font-mono text-xs text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none"
+              >${escapeHTML(key)}</textarea>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
+              <button
+                type="button"
+                onclick="clearSupabaseConfig()"
+                class="px-3.5 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold cursor-pointer"
+              >
+                Reset Kredensial
+              </button>
+
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  onclick="closeSupabaseConfigModal()"
+                  class="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-50 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold shadow-sm cursor-pointer"
+                >
+                  Simpan &amp; Hubungkan
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      `;
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function closeSupabaseConfigModal() {
+      const modal = document.getElementById('supabase-config-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    async function saveSupabaseConfig(event) {
+      event.preventDefault();
+      const f = event.target;
+      const url = f.sbUrl.value.trim();
+      const key = f.sbKey.value.trim();
+
+      if (!url || !key) {
+        showToast('URL dan Anon Key wajib diisi.', 'warning');
+        return;
+      }
+
+      localStorage.setItem('sb_url', url);
+      localStorage.setItem('sb_key', key);
+
+      const ok = initSupabaseClient();
+      closeSupabaseConfigModal();
+
+      if (ok) {
+        showToast('Konfigurasi Supabase berhasil disimpan dan terhubung!', 'success');
+        await bootstrapAuthSession();
+      } else {
+        showToast('Format URL atau Key Supabase tidak valid.', 'error');
+        render();
+      }
+    }
+
+    function clearSupabaseConfig() {
+      localStorage.removeItem('sb_url');
+      localStorage.removeItem('sb_key');
+      initSupabaseClient();
+      closeSupabaseConfigModal();
+      render();
+      showToast('Kredensial localStorage telah dihapus.', 'info');
+    }
+
+    /**
+     * ============================================================================
+     * 5. AUTENTIKASI & PEMISAHAN ROLE (public.profiles)
+     * ============================================================================
+     */
+    async function bootstrapAuthSession() {
+      cleanupIntervalsAndRealtime();
+
+      if (!supabaseClient) {
+        state.screen = 'login';
+        state.authUser = null;
+        state.profile = null;
+        render();
+        return;
+      }
+
+      try {
+        const { data: { session }, error } = await supabaseClient.auth.getSession();
+        if (error) throw error;
+
+        if (!session || !session.user) {
+          state.screen = 'login';
+          state.authUser = null;
+          state.profile = null;
+          render();
+          return;
+        }
+
+        await resolveUserProfileAndRoute(session.user);
+      } catch (err) {
+        console.error('Session bootstrap error:', err);
+        state.screen = 'login';
+        render();
+      }
+    }
+
+    async function handleLoginSubmit(event) {
+      event.preventDefault();
+      if (!supabaseClient) {
+        state.loginError = 'Koneksi Supabase belum diatur. Klik tombol "Pengaturan Koneksi Supabase" terlebih dahulu.';
+        render();
+        openSupabaseConfigModal();
+        return;
+      }
+
+      const f = event.target;
+      let rawUsername = (f.username.value || '').trim().toLowerCase();
+      const password = f.password.value || '';
+
+      if (!rawUsername || !password) {
+        state.loginError = 'Username dan password wajib diisi.';
+        render();
+        return;
+      }
+
+      // Otomatis tambahkan domain sekolah jika tidak mengandung '@'
+      const email = rawUsername.includes('@') ? rawUsername : `${rawUsername}@sekolah.sch.id`;
+
+      state.loginSubmitting = true;
+      state.loginError = '';
+      render();
+
+      try {
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
+          email,
+          password
+        });
+
+        if (error) {
+          throw new Error(error.message === 'Invalid login credentials'
+            ? 'Username atau password salah. Periksa kembali akun Anda.'
+            : error.message);
+        }
+
+        await resolveUserProfileAndRoute(data.user);
+      } catch (err) {
+        state.loginSubmitting = false;
+        state.loginError = err.message || 'Gagal masuk ke sistem.';
+        render();
+      }
+    }
+
+    async function resolveUserProfileAndRoute(user) {
+      try {
+        const { data: profile, error } = await supabaseClient
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        if (error || !profile) {
+          throw new Error('Akun berhasil login, tetapi data profil belum terdaftar di tabel public.profiles. Hubungi Administrator sekolah.');
+        }
+
+        state.authUser = user;
+        state.profile = profile;
+        state.loginSubmitting = false;
+        state.loginError = '';
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const modeParam = urlParams.get('mode');
+
+        // Pemisahan tegas berdasarkan role
+        if (profile.role === 'guru' || profile.role === 'admin') {
+          if (modeParam === 'siswa') {
+            state.screen = 'role_blocked';
+            render();
+            return;
+          }
+          state.screen = 'teacher';
+          render();
+          await loadTeacherExams();
+        } else if (profile.role === 'siswa') {
+          // Pastikan siswa tidak bisa masuk ke tampilan guru dalam kondisi apapun
+          state.screen = 'student';
+          state.student.step = 'select_exam';
+          render();
+          await loadActiveExamsForStudent();
+        } else {
+          throw new Error(`Role pengguna "${profile.role}" tidak dikenali.`);
+        }
+      } catch (err) {
+        state.loginSubmitting = false;
+        state.loginError = err.message;
+        state.screen = 'login';
+        render();
+      }
+    }
+
+    function returnToTeacherCleanUrl() {
+      window.history.replaceState({}, '', window.location.pathname);
+      state.screen = 'teacher';
+      render();
+      loadTeacherExams();
+    }
+
+    async function handleLogout() {
+      cleanupIntervalsAndRealtime();
+      if (supabaseClient) {
+        await supabaseClient.auth.signOut();
+      }
+      state.authUser = null;
+      state.profile = null;
+      state.screen = 'login';
+      state.loginError = '';
+      state.teacher.exams = [];
+      state.teacher.selectedExamId = null;
+      state.teacher.questions = [];
+      state.teacher.sessions = [];
+      state.student.step = 'select_exam';
+      state.student.selectedExam = null;
+      state.student.session = null;
+      state.student.questions = [];
+      state.student.answersMap = {};
+      render();
+      showToast('Anda telah keluar dari sesi.', 'info');
+    }
+
+    function cleanupIntervalsAndRealtime() {
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+      }
+      if (blurLockTimeout) {
+        clearTimeout(blurLockTimeout);
+        blurLockTimeout = null;
+      }
+      if (realtimeChannel && supabaseClient) {
+        supabaseClient.removeChannel(realtimeChannel);
+        realtimeChannel = null;
+      }
+    }
+
+    /**
+     * ============================================================================
+     * 6. LOGIKA DASHBOARD GURU (ISOLASI PER guru_id)
+     * ============================================================================
+     */
+    function getSelectedTeacherExam() {
+      return state.teacher.exams.find(e => e.id === state.teacher.selectedExamId) || null;
+    }
+
+    async function loadTeacherExams() {
+      if (!supabaseClient || !state.profile) return;
+
+      try {
+        let query = supabaseClient
+          .from('exams')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        // Guru hanya melihat ujian miliknya sendiri; admin dapat melihat semua jika perlu atau miliknya
+        if (state.profile.role === 'guru') {
+          query = query.eq('guru_id', state.profile.id);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        state.teacher.exams = data || [];
+        if (state.teacher.exams.length > 0) {
+          const stillExists = state.teacher.exams.some(e => e.id === state.teacher.selectedExamId);
+          if (!stillExists) {
+            state.teacher.selectedExamId = state.teacher.exams[0].id;
+          }
+          await onTeacherExamChanged(state.teacher.selectedExamId);
+        } else {
+          state.teacher.selectedExamId = null;
+          state.teacher.questions = [];
+          state.teacher.sessions = [];
+          render();
+        }
+      } catch (err) {
+        console.error(err);
+        showToast('Gagal memuat daftar paket ujian: ' + err.message, 'error');
+      }
+    }
+
+    async function onTeacherExamChanged(examId) {
+      state.teacher.selectedExamId = examId;
+      state.teacher.wordPreview = { fileName: '', items: [], uploadingImages: false, savingToDb: false };
+      render();
+
+      if (!examId) return;
+      await Promise.all([
+        loadTeacherQuestions(examId),
+        loadTeacherMonitoringSessions(examId)
+      ]);
+      subscribeTeacherRealtimeMonitoring(examId);
+    }
+
+    async function handleCreateNewExam(event) {
+      event.preventDefault();
+      if (!supabaseClient || !state.profile) return;
+
+      const f = event.target;
+      const judul_ujian = f.judul_ujian.value.trim();
+      const mapel = f.mapel.value.trim();
+      const durasi_menit = Math.max(5, Math.min(300, parseInt(f.durasi_menit.value, 10) || 60));
+
+      if (!judul_ujian || !mapel) {
+        showToast('Judul ujian dan mata pelajaran wajib diisi.', 'warning');
+        return;
+      }
+
+      state.teacher.creatingExam = true;
+      render();
+
+      try {
+        const token_ujian = generateRandomToken(6);
+        const { data, error } = await supabaseClient
+          .from('exams')
+          .insert({
+            guru_id: state.profile.id,
+            judul_ujian,
+            mapel,
+            token_ujian,
+            durasi_menit,
+            is_active: false
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        state.teacher.creatingExam = false;
+        state.teacher.showCreateExamForm = false;
+        state.teacher.exams.unshift(data);
+        state.teacher.selectedExamId = data.id;
+        showToast(`Paket ujian "${judul_ujian}" dibuat dengan Token: ${token_ujian}`, 'success');
+        await onTeacherExamChanged(data.id);
+      } catch (err) {
+        state.teacher.creatingExam = false;
+        render();
+        showToast('Gagal membuat paket ujian: ' + err.message, 'error');
+      }
+    }
+
+    async function toggleExamActiveStatus() {
+      const exam = getSelectedTeacherExam();
+      if (!exam || !supabaseClient) return;
+
+      const nextStatus = !exam.is_active;
+      try {
+        const { error } = await supabaseClient
+          .from('exams')
+          .update({ is_active: nextStatus })
+          .eq('id', exam.id);
+
+        if (error) throw error;
+        exam.is_active = nextStatus;
+        render();
+        showToast(
+          nextStatus
+            ? `Ujian "${exam.judul_ujian}" DIAKTIFKAN! Siswa kini dapat masuk menggunakan token ${exam.token_ujian}.`
+            : `Ujian "${exam.judul_ujian}" DINONAKTIFKAN.`,
+          nextStatus ? 'success' : 'info'
+        );
+      } catch (err) {
+        showToast('Gagal mengubah status ujian: ' + err.message, 'error');
+      }
+    }
+
+    async function regenerateExamToken() {
+      const exam = getSelectedTeacherExam();
+      if (!exam || !supabaseClient) return;
+
+      const newToken = generateRandomToken(6);
+      try {
+        const { error } = await supabaseClient
+          .from('exams')
+          .update({ token_ujian: newToken })
+          .eq('id', exam.id);
+
+        if (error) throw error;
+        exam.token_ujian = newToken;
+        render();
+        showToast(`Token sesi diperbarui menjadi: ${newToken}`, 'success');
+      } catch (err) {
+        showToast('Gagal mengacak ulang token: ' + err.message, 'error');
+      }
+    }
+function confirmDeleteSelectedExam() {
+      const exam = getSelectedTeacherExam();
+      if (!exam || !supabaseClient) return;
+
+      openConfirmModal({
+        title: `Hapus Paket "${exam.judul_ujian}"?`,
+        message: `Seluruh butir soal dan riwayat nilai peserta pada mata pelajaran ${exam.mapel} akan ikut terhapus permanen dan tidak dapat dikembalikan.`,
+        confirmLabel: 'Ya, Hapus Paket',
+        confirmClass: 'bg-rose-600 hover:bg-rose-700',
+        onConfirm: async () => {
+          try {
+            const { error } = await supabaseClient
+              .from('exams')
+              .delete()
+              .eq('id', exam.id);
+
+            if (error) throw error;
+            showToast(`Paket ujian "${exam.judul_ujian}" berhasil dihapus.`, 'success');
+            await loadTeacherExams();
+          } catch (err) {
+            showToast('Gagal menghapus paket ujian: ' + err.message, 'error');
+          }
+        }
+      });
+    }
+
+    // --- TAB 1: BANK SOAL, TEMPLATE WORD (.DOCX) & MAMMOTH PARSER ---
+    async function loadTeacherQuestions(examId) {
+      if (!supabaseClient || !examId) return;
+      state.teacher.loadingQuestions = true;
+      render();
+
+      try {
+        const { data, error } = await supabaseClient
+          .from('questions')
+          .select('*')
+          .eq('exam_id', examId)
+          .order('nomor_urut', { ascending: true });
+
+        if (error) throw error;
+        state.teacher.questions = data || [];
+      } catch (err) {
+        showToast('Gagal memuat bank soal: ' + err.message, 'error');
+      } finally {
+        state.teacher.loadingQuestions = false;
+        render();
+      }
+    }
+
+    // Generate & Download Template Microsoft Word (.docx) asli menggunakan JSZip
+    async function downloadWordTemplateDocx() {
+      if (!window.JSZip) {
+        showToast('Library JSZip belum siap.', 'error');
+        return;
+      }
+
+      const exam = getSelectedTeacherExam();
+      const mapelName = exam ? `${exam.mapel} — ${exam.judul_ujian}` : 'Mata Pelajaran Sekolah';
+
+      try {
+        const zip = new JSZip();
+
+        zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`);
+
+        zip.folder('_rels').file('.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`);
+
+        zip.folder('word').folder('_rels').file('document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>`);
+
+        const makeCell = (text, widthDxa, isHeader = false) => {
+          const shading = isHeader ? '<w:shd w:val="clear" w:color="auto" w:fill="1E1B4B"/>' : '';
+          const color = isHeader ? '<w:color w:val="FFFFFF"/>' : '<w:color w:val="1E293B"/>';
+          const bold = isHeader ? '<w:b/>' : '';
+          return `
+            <w:tc>
+              <w:tcPr>
+                <w:tcW w:w="${widthDxa}" w:type="dxa"/>
+                ${shading}
+                <w:tcMar>
+                  <w:top w:w="100" w:type="dxa"/>
+                  <w:bottom w:w="100" w:type="dxa"/>
+                  <w:left w:w="120" w:type="dxa"/>
+                  <w:right w:w="120" w:type="dxa"/>
+                </w:tcMar>
+              </w:tcPr>
+              <w:p>
+                <w:r>
+                  <w:rPr>${bold}${color}<w:sz w:val="20"/></w:rPr>
+                  <w:t xml:space="preserve">${escapeXML(text)}</w:t>
+                </w:r>
+              </w:p>
+            </w:tc>`;
+        };
+
+        const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r>
+        <w:rPr><w:b/><w:color w:val="312E81"/><w:sz w:val="28"/></w:rPr>
+        <w:t>TEMPLATE IMPORT SOAL UJIAN — EDUSHIELD CBT</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:r>
+        <w:rPr><w:color w:val="475569"/><w:sz w:val="20"/></w:rPr>
+        <w:t>Paket Ujian: ${escapeXML(mapelName)}</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:r>
+        <w:rPr><w:i/><w:color w:val="334155"/><w:sz w:val="18"/></w:rPr>
+        <w:t>Petunjuk: Isi soal pada tabel 8 kolom di bawah ini. Jangan ubah judul header kolom. Untuk soal bergambar, cukup Copy-Paste atau Insert Picture langsung di dalam sel kolom "Soal &amp; Gambar". Kolom Kunci diisi huruf A, B, C, atau D. Kolom Bobot diisi angka poin soal.</w:t>
+      </w:r>
+    </w:p>
+    <w:p/>
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="9360" w:type="dxa"/>
+        <w:tblBorders>
+          <w:top w:val="single" w:sz="6" w:space="0" w:color="94A3B8"/>
+          <w:left w:val="single" w:sz="6" w:space="0" w:color="94A3B8"/>
+          <w:bottom w:val="single" w:sz="6" w:space="0" w:color="94A3B8"/>
+          <w:right w:val="single" w:sz="6" w:space="0" w:color="94A3B8"/>
+          <w:insideH w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>
+          <w:insideV w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>
+        </w:tblBorders>
+      </w:tblPr>
+      <w:tr>
+        ${makeCell('No', 550, true)}
+        ${makeCell('Soal & Gambar', 3010, true)}
+        ${makeCell('Opsi A', 1100, true)}
+        ${makeCell('Opsi B', 1100, true)}
+        ${makeCell('Opsi C', 1100, true)}
+        ${makeCell('Opsi D', 1100, true)}
+        ${makeCell('Kunci', 700, true)}
+        ${makeCell('Bobot', 700, true)}
+      </w:tr>
+      <w:tr>
+        ${makeCell('1', 550)}
+        ${makeCell('Perhatikan pernyataan berikut! Sumber energi utama bagi makhluk hidup di bumi berasal dari...', 3010)}
+        ${makeCell('Matahari', 1100)}
+        ${makeCell('Bulan', 1100)}
+        ${makeCell('Bintang', 1100)}
+        ${makeCell('Panas Bumi', 1100)}
+        ${makeCell('A', 700)}
+        ${makeCell('10', 700)}
+      </w:tr>
+      <w:tr>
+        ${makeCell('2', 550)}
+        ${makeCell('Hasil dari 15 x 4 + 20 : 2 adalah... (Anda dapat menempelkan gambar grafik/diagram langsung di kolom ini)', 3010)}
+        ${makeCell('40', 1100)}
+        ${makeCell('70', 1100)}
+        ${makeCell('80', 1100)}
+        ${makeCell('90', 1100)}
+        ${makeCell('B', 700)}
+        ${makeCell('15', 700)}
+      </w:tr>
+    </w:tbl>
+    <w:sectPr>
+      <w:pgSz w:w="11906" w:h="16838"/>
+      <w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"/>
+    </w:sectPr>
+  </w:body>
+</w:document>`;
+
+        zip.folder('word').file('document.xml', documentXml);
+
+        const blob = await zip.generateAsync({
+          type: 'blob',
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        });
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Template_Soal_EduShield.docx';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        showToast('Template_Soal_EduShield.docx berhasil diunduh!', 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('Gagal membuat template Word: ' + err.message, 'error');
+      }
+    }
+
+    // Konversi Data URI base64 menjadi Blob untuk diunggah ke Supabase Storage
+    function dataUriToBlob(dataUri) {
+      const parts = dataUri.split(',');
+      const mimeMatch = parts[0].match(/:(.*?);/);
+      const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+      const binaryStr = atob(parts[1]);
+      const len = binaryStr.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+      return { blob: new Blob([bytes], { type: mime }), mime };
+    }
+
+    // Upload file gambar ke bucket Supabase Storage 'gambar-soal'
+    async function uploadImageBlobToStorage(blob, ext = 'png') {
+      const exam = getSelectedTeacherExam();
+      if (!supabaseClient || !exam) return null;
+
+      const filePath = `${exam.id}/${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`;
+      const { error: uploadError } = await supabaseClient.storage
+        .from('gambar-soal')
+        .upload(filePath, blob, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: pubData } = supabaseClient.storage
+        .from('gambar-soal')
+        .getPublicUrl(filePath);
+
+      return pubData ? pubData.publicUrl : null;
+    }
+
+    // Upload & Parse file .docx menggunakan Mammoth.js + Upload gambar ke Storage
+    async function handleDocxUpload(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      const exam = getSelectedTeacherExam();
+      if (!exam) {
+        showToast('Pilih atau buat paket ujian terlebih dahulu.', 'warning');
+        event.target.value = '';
+        return;
+      }
+
+      if (!file.name.toLowerCase().endsWith('.docx')) {
+        showToast('File harus berformat Microsoft Word (.docx).', 'error');
+        event.target.value = '';
+        return;
+      }
+
+      state.teacher.wordPreview = {
+        fileName: file.name,
+        items: [],
+        uploadingImages: true,
+        savingToDb: false
+      };
+      render();
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.convertToHtml({ arrayBuffer });
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(result.value, 'text/html');
+        const table = doc.querySelector('table');
+
+        if (!table) {
+          throw new Error('Tabel 8 kolom tidak ditemukan di dalam file Word. Gunakan Template_Soal_EduShield.docx.');
+        }
+
+        const rows = Array.from(table.querySelectorAll('tr'));
+        if (rows.length <= 1) {
+          throw new Error('Tabel di dalam file Word masih kosong.');
+        }
+
+        const parsedItems = [];
+        let storageWarningShown = false;
+
+        for (let i = 1; i < rows.length; i++) {
+          const cells = Array.from(rows[i].querySelectorAll('td, th'));
+          if (cells.length < 7) continue;
+
+          const imgEl = cells[1].querySelector('img');
+          const rawImgSrc = imgEl ? imgEl.getAttribute('src') : null;
+
+          const pertanyaan = (cells[1].textContent || '').replace(/\s+/g, ' ').trim();
+          const opsi_a = (cells[2].textContent || '').replace(/\s+/g, ' ').trim();
+          const opsi_b = (cells[3].textContent || '').replace(/\s+/g, ' ').trim();
+          const opsi_c = (cells[4].textContent || '').replace(/\s+/g, ' ').trim();
+          const opsi_d = (cells[5].textContent || '').replace(/\s+/g, ' ').trim();
+
+          if (!pertanyaan && !rawImgSrc && !opsi_a && !opsi_b) continue;
+
+          let kunci_jawaban = (cells[6].textContent || '').trim().toUpperCase();
+          if (!['A', 'B', 'C', 'D'].includes(kunci_jawaban)) {
+            kunci_jawaban = 'A';
+          }
+
+          const rawBobot = parseInt((cells[7] ? cells[7].textContent : '1').replace(/[^0-9]/g, ''), 10);
+          const bobot = !isNaN(rawBobot) && rawBobot > 0 ? rawBobot : 1;
+
+          // Jika ada gambar base64 di sel soal, unggah ke bucket 'gambar-soal'
+          let finalImageUrl = null;
+          if (rawImgSrc && rawImgSrc.startsWith('data:image/')) {
+            try {
+              const { blob, mime } = dataUriToBlob(rawImgSrc);
+              const ext = (mime.split('/')[1] || 'png').replace('jpeg', 'jpg');
+              finalImageUrl = await uploadImageBlobToStorage(blob, ext);
+            } catch (uploadErr) {
+              console.warn('Upload gambar ke bucket gambar-soal gagal:', uploadErr);
+              if (!storageWarningShown) {
+                storageWarningShown = true;
+                showToast('Catatan: Pastikan bucket "gambar-soal" di Supabase Storage sudah diatur Public & Policy INSERT aktif.', 'warning');
+              }
+            }
+          }
+
+          parsedItems.push({
+            tempId: `WORD-${Date.now()}-${i}`,
+            pertanyaan: pertanyaan || '(Perhatikan gambar berikut)',
+            gambar_url: finalImageUrl,
+            opsi_a: opsi_a || '-',
+            opsi_b: opsi_b || '-',
+            opsi_c: opsi_c || '-',
+            opsi_d: opsi_d || '-',
+            kunci_jawaban,
+            bobot
+          });
+        }
+
+        event.target.value = '';
+
+        if (parsedItems.length === 0) {
+          throw new Error('Tidak ditemukan baris soal yang valid pada tabel Word.');
+        }
+
+        state.teacher.wordPreview = {
+          fileName: file.name,
+          items: parsedItems,
+          uploadingImages: false,
+          savingToDb: false
+        };
+        render();
+        showToast(`${parsedItems.length} soal berhasil diekstrak dari Word! Periksa pratinjau di bawah.`, 'success');
+      } catch (err) {
+        event.target.value = '';
+        state.teacher.wordPreview = { fileName: '', items: [], uploadingImages: false, savingToDb: false };
+        render();
+        showToast(err.message || 'Gagal membaca file Word.', 'error');
+      }
+    }
+
+    function updateWordPreviewRow(tempId, field, value) {
+      const row = state.teacher.wordPreview.items.find(it => it.tempId === tempId);
+      if (!row) return;
+      if (field === 'kunci_jawaban') {
+        row.kunci_jawaban = value;
+      } else if (field === 'bobot') {
+        row.bobot = Math.max(1, parseInt(value, 10) || 1);
+      }
+    }
+
+    function removeWordPreviewRow(tempId) {
+      state.teacher.wordPreview.items = state.teacher.wordPreview.items.filter(it => it.tempId !== tempId);
+      render();
+    }
+
+    function cancelWordPreview() {
+      state.teacher.wordPreview = { fileName: '', items: [], uploadingImages: false, savingToDb: false };
+      render();
+    }
+
+    async function saveWordPreviewToDatabase() {
+      const exam = getSelectedTeacherExam();
+      const items = state.teacher.wordPreview.items;
+      if (!supabaseClient || !exam || items.length === 0) return;
+
+      state.teacher.wordPreview.savingToDb = true;
+      render();
+
+      try {
+        const startNo = state.teacher.questions.length + 1;
+        const payload = items.map((it, idx) => ({
+          exam_id: exam.id,
+          nomor_urut: startNo + idx,
+          pertanyaan: it.pertanyaan,
+          gambar_url: it.gambar_url,
+          opsi_a: it.opsi_a,
+          opsi_b: it.opsi_b,
+          opsi_c: it.opsi_c,
+          opsi_d: it.opsi_d,
+          kunci_jawaban: it.kunci_jawaban,
+          bobot: Number(it.bobot) || 1
+        }));
+
+        const { error } = await supabaseClient
+          .from('questions')
+          .insert(payload);
+
+        if (error) throw error;
+
+        state.teacher.wordPreview = { fileName: '', items: [], uploadingImages: false, savingToDb: false };
+        showToast(`${payload.length} soal berhasil disimpan ke database!`, 'success');
+        await loadTeacherQuestions(exam.id);
+      } catch (err) {
+        state.teacher.wordPreview.savingToDb = false;
+        render();
+        showToast('Gagal menyimpan soal ke database: ' + err.message, 'error');
+      }
+    }
+
+    // Tambah Soal Manual (dengan gambar opsional)
+    async function handleAddManualQuestion(event) {
+      event.preventDefault();
+      const exam = getSelectedTeacherExam();
+      if (!supabaseClient || !exam) return;
+
+      const f = event.target;
+      const pertanyaan = f.pertanyaan.value.trim();
+      const opsi_a = f.opsi_a.value.trim();
+      const opsi_b = f.opsi_b.value.trim();
+      const opsi_c = f.opsi_c.value.trim();
+      const opsi_d = f.opsi_d.value.trim();
+      const kunci_jawaban = f.kunci_jawaban.value;
+      const bobot = Math.max(1, parseInt(f.bobot.value, 10) || 1);
+      const imageFile = f.gambar_file && f.gambar_file.files ? f.gambar_file.files[0] : null;
+
+      if (!pertanyaan || !opsi_a || !opsi_b || !opsi_c || !opsi_d) {
+        showToast('Lengkapi pertanyaan dan seluruh opsi A–D.', 'warning');
+        return;
+      }
+
+      state.teacher.savingManualQuestion = true;
+      render();
+
+      try {
+        let gambar_url = null;
+        if (imageFile) {
+          const ext = (imageFile.name.split('.').pop() || 'png').toLowerCase();
+          gambar_url = await uploadImageBlobToStorage(imageFile, ext);
+        }
+
+        const nomor_urut = state.teacher.questions.length + 1;
+        const { error } = await supabaseClient
+          .from('questions')
+          .insert({
+            exam_id: exam.id,
+            nomor_urut,
+            pertanyaan,
+            gambar_url,
+            opsi_a,
+            opsi_b,
+            opsi_c,
+            opsi_d,
+            kunci_jawaban,
+            bobot
+          });
+
+        if (error) throw error;
+
+        state.teacher.savingManualQuestion = false;
+        state.teacher.showManualForm = false;
+        showToast('Soal manual berhasil ditambahkan!', 'success');
+        await loadTeacherQuestions(exam.id);
+      } catch (err) {
+        state.teacher.savingManualQuestion = false;
+        render();
+        showToast('Gagal menyimpan soal manual: ' + err.message, 'error');
+      }
+    }
+
+    function confirmDeleteQuestion(questionId, nomorUrut) {
+      openConfirmModal({
+        title: `Hapus Soal No. ${nomorUrut}?`,
+        message: 'Soal yang dihapus tidak dapat dikembalikan dan akan memengaruhi total bobot penilaian ujian ini.',
+        confirmLabel: 'Ya, Hapus Soal',
+        confirmClass: 'bg-rose-600 hover:bg-rose-700',
+        onConfirm: async () => {
+          const exam = getSelectedTeacherExam();
+          if (!supabaseClient || !exam) return;
+          try {
+            const { error } = await supabaseClient
+              .from('questions')
+              .delete()
+              .eq('id', questionId);
+            if (error) throw error;
+            showToast(`Soal No. ${nomorUrut} berhasil dihapus.`, 'info');
+            await loadTeacherQuestions(exam.id);
+          } catch (err) {
+            showToast('Gagal menghapus soal: ' + err.message, 'error');
+          }
+        }
+      });
+    }
+
+    // --- TAB 2 & 3: MONITORING REALTIME & REKAP NILAI ---
+    async function loadTeacherMonitoringSessions(examId) {
+      if (!supabaseClient || !examId) return;
+      state.teacher.loadingSessions = true;
+      render();
+
+      try {
+        // Ambil sesi ujian beserta profil siswa
+        const { data: sessionsData, error } = await supabaseClient
+          .from('exam_sessions')
+          .select(`
+            *,
+            profiles:siswa_id (
+              id,
+              nama_lengkap,
+              username,
+              kelas_atau_mapel
+            )
+          `)
+          .eq('exam_id', examId)
+          .order('waktu_mulai', { ascending: false });
+
+        if (error) throw error;
+
+        const sessions = sessionsData || [];
+
+        // Ambil jumlah jawaban per session_id untuk indikator progres
+        if (sessions.length > 0) {
+          const sessionIds = sessions.map(s => s.id);
+          const { data: answersData } = await supabaseClient
+            .from('student_answers')
+            .select('session_id')
+            .in('session_id', sessionIds);
+
+          const countMap = {};
+          (answersData || []).forEach(row => {
+            countMap[row.session_id] = (countMap[row.session_id] || 0) + 1;
+          });
+
+          sessions.forEach(s => {
+            s.answeredCount = countMap[s.id] || 0;
+          });
+        }
+
+        state.teacher.sessions = sessions;
+      } catch (err) {
+        console.error(err);
+        showToast('Gagal memuat data kehadiran peserta: ' + err.message, 'error');
+      } finally {
+        state.teacher.loadingSessions = false;
+        render();
+      }
+    }
+
+    function subscribeTeacherRealtimeMonitoring(examId) {
+      if (!supabaseClient || !examId) return;
+      if (realtimeChannel) {
+        supabaseClient.removeChannel(realtimeChannel);
+        realtimeChannel = null;
+      }
+
+      realtimeChannel = supabaseClient
+        .channel(`teacher-monitoring-${examId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'exam_sessions',
+            filter: `exam_id=eq.${examId}`
+          },
+          async (payload) => {
+            if (payload.new && payload.new.status === 'terkunci') {
+              showToast('PERINGATAN PENGAWAS: Terdeteksi peserta melanggar aturan layar (Terkunci)!', 'error');
+            }
+            await loadTeacherMonitoringSessions(examId);
+          }
+        )
+        .subscribe();
+    }
+
+    async function resetStudentLock(sessionId, studentName) {
+      if (!supabaseClient) return;
+      try {
+        const { error } = await supabaseClient
+          .from('exam_sessions')
+          .update({
+            status: 'mengerjakan',
+            catatan_pelanggaran: null
+          })
+          .eq('id', sessionId);
+
+        if (error) throw error;
+        showToast(`Kunci layar ${studentName} berhasil di-reset! Siswa dapat melanjutkan ujian.`, 'success');
+        const exam = getSelectedTeacherExam();
+        if (exam) await loadTeacherMonitoringSessions(exam.id);
+      } catch (err) {
+        showToast('Gagal mereset kunci siswa: ' + err.message, 'error');
+      }
+    }
+
+    // Export Nilai ke Excel (.xlsx) menggunakan SheetJS
+    function exportGradesToExcelXlsx() {
+      const exam = getSelectedTeacherExam();
+      if (!exam || !window.XLSX) {
+        showToast('Data ujian atau library Excel belum siap.', 'warning');
+        return;
+      }
+
+      if (state.teacher.sessions.length === 0) {
+        showToast('Belum ada data peserta ujian untuk diekspor.', 'warning');
+        return;
+      }
+
+      const statusLabelMap = {
+        mengerjakan: 'Sedang Mengerjakan',
+        terkunci: 'Terkunci (Pelanggaran)',
+        selesai: 'Selesai'
+      };
+
+      const rows = state.teacher.sessions.map((s, idx) => {
+        const prof = s.profiles || {};
+        return {
+          'No': idx + 1,
+          'Username / NIS': prof.username || '-',
+          'Nama Lengkap Siswa': prof.nama_lengkap || '-',
+          'Kelas': prof.kelas_atau_mapel || '-',
+          'Mata Pelajaran': exam.mapel,
+          'Judul Ujian': exam.judul_ujian,
+          'Status Kehadiran': statusLabelMap[s.status] || s.status,
+          'Waktu Mulai': formatDateTimeID(s.waktu_mulai),
+          'Waktu Selesai': formatDateTimeID(s.waktu_selesai),
+          'Nilai Akhir': Number(s.nilai_akhir || 0)
+        };
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      worksheet['!cols'] = [
+        { wch: 5 },
+        { wch: 18 },
+        { wch: 28 },
+        { wch: 14 },
+        { wch: 20 },
+        { wch: 26 },
+        { wch: 22 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 14 }
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Rekap Nilai');
+
+      const safeFileName = `Rekap_Nilai_${exam.mapel}_${exam.judul_ujian}`
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .replace(/_+/g, '_');
+
+      XLSX.writeFile(workbook, `${safeFileName}.xlsx`);
+      showToast(`File ${safeFileName}.xlsx berhasil diunduh!`, 'success');
+    }
+
+    /**
+     * ============================================================================
+     * 7. LOGIKA PORTAL UJIAN SISWA (ANTI-CURANG & REALTIME UNLOCK)
+     * ============================================================================
+     */
+    async function loadActiveExamsForStudent() {
+      if (!supabaseClient || !state.profile) return;
+      state.student.loadingExams = true;
+      render();
+
+      try {
+        // Ambil daftar ujian aktif
+        const { data: examsData, error: examsErr } = await supabaseClient
+          .from('exams')
+          .select('*')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false });
+
+        if (examsErr) throw examsErr;
+
+        // Ambil riwayat sesi milik siswa ini untuk menampilkan status (sedang mengerjakan/terkunci/selesai)
+        const { data: mySessions, error: sessErr } = await supabaseClient
+          .from('exam_sessions')
+          .select('*')
+          .eq('siswa_id', state.profile.id);
+
+        if (sessErr) throw sessErr;
+
+        const sessMap = {};
+        (mySessions || []).forEach(s => {
+          sessMap[s.exam_id] = s;
+        });
+
+        state.student.activeExams = examsData || [];
+        state.student.existingSessionsMap = sessMap;
+      } catch (err) {
+        showToast('Gagal memuat daftar ujian aktif: ' + err.message, 'error');
+      } finally {
+        state.student.loadingExams = false;
+        render();
+      }
+    }
+
+    async function handleStudentJoinExam(event) {
+      event.preventDefault();
+      if (!supabaseClient || !state.profile) return;
+
+      const f = event.target;
+      const examId = f.exam_id.value;
+      const inputToken = (f.token_ujian.value || '').trim().toUpperCase();
+
+      const exam = state.student.activeExams.find(e => e.id === examId);
+      if (!exam) {
+        showToast('Pilih paket ujian aktif terlebih dahulu.', 'warning');
+        return;
+      }
+
+      if (!inputToken || inputToken !== (exam.token_ujian || '').toUpperCase()) {
+        showToast('Token Ujian tidak valid! Minta token yang benar kepada pengawas.', 'error');
+        return;
+      }
+
+      state.student.loadingExams = true;
+      render();
+
+      try {
+        // 1. Cek apakah sesi sudah ada di exam_sessions
+        let { data: session, error: fetchSessErr } = await supabaseClient
+          .from('exam_sessions')
+          .select('*')
+          .eq('exam_id', exam.id)
+          .eq('siswa_id', state.profile.id)
+          .maybeSingle();
+
+        if (fetchSessErr) throw fetchSessErr;
+
+        // Jika belum ada sesi, buat sesi baru
+        if (!session) {
+          const { data: newSession, error: insErr } = await supabaseClient
+            .from('exam_sessions')
+            .insert({
+              exam_id: exam.id,
+              siswa_id: state.profile.id,
+              status: 'mengerjakan'
+            })
+            .select()
+            .single();
+
+          if (insErr) throw insErr;
+          session = newSession;
+        }
+
+        state.student.selectedExam = exam;
+        state.student.session = session;
+        state.student.loadingExams = false;
+
+        // Jika sesi sudah selesai, langsung ke layar hasil
+        if (session.status === 'selesai') {
+          state.student.step = 'finished';
+          state.student.finalGradeResult = session.nilai_akhir;
+          render();
+          return;
+        }
+
+        // Ambil soal dari VIEW student_questions (aman: tanpa kolom kunci_jawaban & bobot)
+        const { data: qData, error: qErr } = await supabaseClient
+          .from('student_questions')
+          .select('*')
+          .eq('exam_id', exam.id)
+          .order('nomor_urut', { ascending: true });
+
+        if (qErr) throw qErr;
+        if (!qData || qData.length === 0) {
+          throw new Error('Guru belum menginput butir soal untuk paket ujian ini.');
+        }
+
+        // Acak urutan soal berdasarkan kombinasi ID siswa & ID ujian
+        state.student.questions = deterministicShuffle(qData, `${state.profile.id}-${exam.id}`);
+        state.student.currentIndex = 0;
+
+        // Muat jawaban tersimpan dari student_answers jika melanjutkan ujian
+        const { data: savedAns, error: ansErr } = await supabaseClient
+          .from('student_answers')
+          .select('question_id, jawaban')
+          .eq('session_id', session.id);
+
+        if (ansErr) throw ansErr;
+
+        const ansMap = {};
+        (savedAns || []).forEach(a => {
+          if (a.jawaban) ansMap[a.question_id] = a.jawaban;
+        });
+        state.student.answersMap = ansMap;
+        state.student.doubtfulMap = {};
+
+        // Hitung sisa waktu dari waktu_mulai server + durasi_menit
+        const startMs = new Date(session.waktu_mulai).getTime();
+        const endMs = startMs + exam.durasi_menit * 60 * 1000;
+        const remSec = Math.max(0, Math.floor((endMs - Date.now()) / 1000));
+        state.student.remainingSeconds = remSec;
+
+        // Subscribe Realtime untuk deteksi Reset Kunci dari pengawas
+        subscribeStudentSessionRealtime(session.id);
+
+        if (session.status === 'terkunci') {
+          state.student.step = 'locked';
+          render();
+          return;
+        }
+
+        if (remSec <= 0) {
+          await executeSubmitAndGradeExam(true);
+          return;
+        }
+
+        state.student.step = 'exam';
+        startStudentCountdownTimer();
+        render();
+        showToast('Sesi ujian dimulai! Sistem pengawasan layar aktif.', 'success');
+      } catch (err) {
+        state.student.loadingExams = false;
+        render();
+        showToast(err.message || 'Gagal memulai ujian.', 'error');
+      }
+    }
+
+    function startStudentCountdownTimer() {
+      if (countdownInterval) clearInterval(countdownInterval);
+
+      countdownInterval = setInterval(async () => {
+        if (state.screen !== 'student' || state.student.step !== 'exam') return;
+
+        const exam = state.student.selectedExam;
+        const session = state.student.session;
+        if (!exam || !session) return;
+
+        const endMs = new Date(session.waktu_mulai).getTime() + exam.durasi_menit * 60 * 1000;
+        const remSec = Math.max(0, Math.floor((endMs - Date.now()) / 1000));
+        state.student.remainingSeconds = remSec;
+
+        const timerEl = document.getElementById('student-timer-display');
+        if (timerEl) {
+          timerEl.textContent = formatCountdown(remSec);
+          if (remSec <= 300) {
+            timerEl.parentElement.classList.add('bg-rose-600', 'animate-pulse');
+          }
+        }
+
+        if (remSec <= 0) {
+          clearInterval(countdownInterval);
+          countdownInterval = null;
+          showToast('Waktu pengerjaan telah habis! Jawaban dikumpulkan otomatis.', 'warning');
+          await executeSubmitAndGradeExam(true);
+        }
+      }, 1000);
+    }
+
+    // Auto-save pilihan jawaban A/B/C/D ke tabel student_answers
+    async function handleStudentSelectAnswer(questionId, jawaban) {
+      if (!supabaseClient || !state.student.session) return;
+      if (state.student.session.status !== 'mengerjakan') return;
+
+      // Update UI secara optimistik terlebih dahulu agar responsif di HP
+      state.student.answersMap[questionId] = jawaban;
+      state.student.savingAnswerId = questionId;
+      render();
+
+      try {
+        const { error } = await supabaseClient
+          .from('student_answers')
+          .upsert(
+            {
+              session_id: state.student.session.id,
+              question_id: questionId,
+              jawaban
+            },
+            { onConflict: 'session_id,question_id' }
+          );
+
+        if (error) throw error;
+        state.student.lastSavedText = `Tersimpan (${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })})`;
+      } catch (err) {
+        showToast('Gagal menyimpan jawaban otomatis: ' + err.message, 'error');
+      } finally {
+        state.student.savingAnswerId = null;
+        render();
+      }
+    }
+
+    function toggleStudentDoubtful(questionId) {
+      state.student.doubtfulMap[questionId] = !state.student.doubtfulMap[questionId];
+      render();
+    }
+
+    function goToStudentQuestionIndex(idx) {
+      if (idx >= 0 && idx < state.student.questions.length) {
+        state.student.currentIndex = idx;
+        render();
+      }
+    }
+
+    // --- PROTEKSI ANTI-CURANG & REALTIME UNLOCK ---
+    function isStudentCurrentlyInActiveExam() {
+      return (
+        state.screen === 'student' &&
+        state.student.step === 'exam' &&
+        state.student.session &&
+        state.student.session.status === 'mengerjakan' &&
+        !state.student.submittingExam
+      );
+    }
+
+    async function lockStudentExamDueToViolation(reasonText) {
+      if (!isStudentCurrentlyInActiveExam() || !supabaseClient) return;
+
+      const session = state.student.session;
+      session.status = 'terkunci';
+      session.catatan_pelanggaran = reasonText;
+      state.student.step = 'locked';
+      render();
+
+      try {
+        await supabaseClient
+          .from('exam_sessions')
+          .update({
+            status: 'terkunci',
+            catatan_pelanggaran: reasonText
+          })
+          .eq('id', session.id);
+      } catch (err) {
+        console.error('Gagal mengirim status terkunci ke server:', err);
+      }
+    }
+
+    // Berlangganan Realtime pada baris sesi siswa agar otomatis terbuka saat guru menekan "Reset Kunci"
+    function subscribeStudentSessionRealtime(sessionId) {
+      if (!supabaseClient || !sessionId) return;
+      if (realtimeChannel) {
+        supabaseClient.removeChannel(realtimeChannel);
+        realtimeChannel = null;
+      }
+
+      realtimeChannel = supabaseClient
+        .channel(`student-session-${sessionId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'exam_sessions',
+            filter: `id=eq.${sessionId}`
+          },
+          (payload) => {
+            const updated = payload.new;
+            if (!updated || !state.student.session) return;
+
+            state.student.session = { ...state.student.session, ...updated };
+
+            if (updated.status === 'mengerjakan' && state.student.step === 'locked') {
+              state.student.step = 'exam';
+              startStudentCountdownTimer();
+              render();
+              showToast('Kunci ujian telah dibuka oleh pengawas! Silakan lanjutkan mengerjakan.', 'success');
+            } else if (updated.status === 'selesai' && state.student.step !== 'finished') {
+              state.student.step = 'finished';
+              state.student.finalGradeResult = updated.nilai_akhir;
+              render();
+            }
+          }
+        )
+        .subscribe();
+    }
+
+    // Fallback manual check jika WebSocket terhambat jaringan sekolah
+    async function checkStudentUnlockStatusManual() {
+      if (!supabaseClient || !state.student.session) return;
+      try {
+        const { data, error } = await supabaseClient
+          .from('exam_sessions')
+          .select('*')
+          .eq('id', state.student.session.id)
+          .single();
+
+        if (error) throw error;
+        state.student.session = data;
+
+        if (data.status === 'mengerjakan') {
+          state.student.step = 'exam';
+          startStudentCountdownTimer();
+          render();
+          showToast('Akses dibuka oleh pengawas! Ujian dilanjutkan.', 'success');
+        } else {
+          showToast('Status masih terkunci. Minta pengawas menekan "Reset Kunci".', 'warning');
+        }
+      } catch (err) {
+        showToast('Gagal memeriksa status: ' + err.message, 'error');
+      }
+    }
+
+    // Konfirmasi & Eksekusi RPC Penilaian Server submit_and_grade_exam
+    function promptStudentFinishExam() {
+      const totalQ = state.student.questions.length;
+      const answeredQ = state.student.questions.filter(q => Boolean(state.student.answersMap[q.id])).length;
+      const unansweredQ = totalQ - answeredQ;
+
+      openConfirmModal({
+        title: 'Kumpulkan Jawaban & Akhiri Ujian?',
+        message: unansweredQ > 0
+          ? `Anda telah menjawab ${answeredQ} dari ${totalQ} soal (masih ada ${unansweredQ} soal belum dijawab). Setelah dikumpulkan, jawaban tidak dapat diubah lagi.`
+          : `Seluruh ${totalQ} soal telah terjawab. Tekan tombol di bawah untuk mengakhiri ujian dan menghitung nilai akhir Anda di server.`,
+        confirmLabel: 'Ya, Selesai & Kumpulkan',
+        confirmClass: 'bg-emerald-600 hover:bg-emerald-700',
+        onConfirm: async () => {
+          await executeSubmitAndGradeExam(false);
+        }
+      });
+    }
+
+    async function executeSubmitAndGradeExam(isAutoTimeout = false) {
+      if (!supabaseClient || !state.student.session || state.student.submittingExam) return;
+
+      state.student.submittingExam = true;
+      render();
+
+      try {
+        const { data: gradeData, error } = await supabaseClient.rpc('submit_and_grade_exam', {
+          p_session_id: state.student.session.id
+        });
+
+        if (error) throw error;
+
+        if (countdownInterval) {
+          clearInterval(countdownInterval);
+          countdownInterval = null;
+        }
+
+        state.student.session.status = 'selesai';
+        state.student.session.nilai_akhir = gradeData;
+        state.student.finalGradeResult = gradeData;
+        state.student.submittingExam = false;
+        state.student.step = 'finished';
+        render();
+
+        if (!isAutoTimeout) {
+          showToast('Ujian selesai! Nilai akhir berhasil dihitung oleh server.', 'success');
+        }
+      } catch (err) {
+        state.student.submittingExam = false;
+        render();
+        showToast('Gagal mengumpulkan ujian: ' + err.message, 'error');
+      }
+    }
+
+    function backToStudentExamList() {
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+      }
+      if (realtimeChannel && supabaseClient) {
+        supabaseClient.removeChannel(realtimeChannel);
+        realtimeChannel = null;
+      }
+      state.student.step = 'select_exam';
+      state.student.selectedExam = null;
+      state.student.session = null;
+      state.student.questions = [];
+      state.student.answersMap = {};
+      loadActiveExamsForStudent();
+    }
+
+    /**
+     * ============================================================================
+     * 8. EVENT LISTENER KEAMANAN BROWSER (BLOKIR KLIK KANAN, SHORTCUT, BLUR/TAB)
+     * ============================================================================
+     */
+    document.addEventListener('contextmenu', (e) => {
+      if (isStudentCurrentlyInActiveExam()) {
+        e.preventDefault();
+      }
+    });
+
+    ['copy', 'cut', 'paste'].forEach(evtName => {
+      document.addEventListener(evtName, (e) => {
+        if (isStudentCurrentlyInActiveExam()) {
+          e.preventDefault();
+          showToast('Fitur salin/tempel dinonaktifkan selama ujian berlangsung.', 'warning');
+        }
+      });
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (!isStudentCurrentlyInActiveExam()) return;
+
+      const key = e.key.toUpperCase();
+      const isCtrlOrMeta = e.ctrlKey || e.metaKey;
+
+      // Blokir F12, Ctrl+Shift+I/J/C, Ctrl+U, PrintScreen
+      if (
+        e.key === 'F12' ||
+        (isCtrlOrMeta && e.shiftKey && ['I', 'J', 'C'].includes(key)) ||
+        (isCtrlOrMeta && ['U', 'S', 'P'].includes(key))
+      ) {
+        e.preventDefault();
+        showToast('Pintasan keyboard pengembang dinonaktifkan selama ujian.', 'warning');
+      }
+    });
+
+    // Deteksi berpindah tab / memanggil Google Lens / split screen
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && isStudentCurrentlyInActiveExam()) {
+        lockStudentExamDueToViolation('Meninggalkan layar ujian / Membuka tab atau aplikasi lain');
+      }
+    });
+
+    window.addEventListener('blur', () => {
+      if (!isStudentCurrentlyInActiveExam()) return;
+      if (blurLockTimeout) clearTimeout(blurLockTimeout);
+      blurLockTimeout = setTimeout(() => {
+        if (isStudentCurrentlyInActiveExam() && !document.hasFocus()) {
+          lockStudentExamDueToViolation('Kehilangan fokus layar (Deteksi Google Lens / Split-Screen / Floating App)');
+        }
+      }, 250);
+    });
+
+    /**
+     * ============================================================================
+     * 9. RENDERER KOMPONEN ANTARMUKA (UI)
+     * ============================================================================
+     */
+    function renderHeaderActions() {
+      const container = document.getElementById('header-actions');
+      if (!container) return;
+
+      if (!state.profile) {
+        container.innerHTML = `
+          <button
+style="display:none;"
+            type="button"
+            onclick="openSupabaseConfigModal()"
+            class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer"
+          >
+            <i data-lucide="settings" class="w-4 h-4 text-indigo-400"></i>
+            <span>Pengaturan Koneksi Supabase</span>
+          </button>
+        `;
+        return;
+      }
+
+      const roleLabel = state.profile.role === 'siswa' ? 'PESERTA UJIAN' : state.profile.role.toUpperCase();
+      container.innerHTML = `
+        <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700 text-xs">
+          <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-bold text-[10px]">${escapeHTML(roleLabel)}</span>
+          <span class="font-semibold text-white">${escapeHTML(state.profile.nama_lengkap)}</span>
+        </div>
+        <button
+          type="button"
+          onclick="handleLogout()"
+          class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold transition cursor-pointer"
+        >
+          <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+          <span>Keluar</span>
+        </button>
+      `;
+    }
+
+    // --- LAYAR 1: HALAMAN LOGIN TERPADU ---
+    function renderLoginScreen() {
+      const { url, key } = getSupabaseCredentials();
+      const isConfigured = Boolean(url && key);
+
+      return `
+        <div class="max-w-md mx-auto py-4 sm:py-10">
+          ${!isConfigured ? `
+            <div class="mb-5 p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 flex items-start gap-3 shadow-xs">
+              <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600 shrink-0 mt-0.5"></i>
+              <div class="text-xs leading-relaxed">
+                <p class="font-bold mb-1">Koneksi Database Supabase Belum Diatur</p>
+                <p class="text-amber-800 mb-2">Masukkan Project URL dan Anon Public Key Supabase Anda agar sistem login dan database dapat digunakan.</p>
+                <button
+                  type="button"
+                  onclick="openSupabaseConfigModal()"
+                  class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs cursor-pointer"
+                >
+                  Atur Koneksi Sekarang
+                </button>
+              </div>
+            </div>
+          ` : ''}
+
+          <div class="bg-white rounded-3xl border border-slate-200 shadow-lg p-6 sm:p-8">
+            <div class="text-center mb-6">
+              <div class="w-14 h-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mx-auto mb-3 shadow-lg shadow-indigo-600/25">
+                <i data-lucide="lock" class="w-7 h-7"></i>
+              </div>
+              <h1 class="text-2xl font-extrabold text-slate-900">Masuk EduShield CBT</h1>
+              <p class="text-xs sm:text-sm text-slate-500 mt-1">
+                Gunakan Username / NISN dan Password yang diberikan oleh sekolah.
+              </p>
+            </div>
+
+            <form onsubmit="handleLoginSubmit(event)" class="space-y-4">
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Username / NISN
+                </label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                    <i data-lucide="user" class="w-4 h-4"></i>
+                  </span>
+                  <input
+                    type="text"
+                    name="username"
+                    required
+                    autocomplete="username"
+                    placeholder="Contoh: budi.mtk atau 242512001"
+                    class="w-full rounded-xl border border-slate-300 bg-slate-50 pl-10 pr-4 py-3 text-sm font-medium text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition"
+                  />
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1">
+                  Otomatis dilengkapi domain <code class="font-mono text-slate-500">@sekolah.sch.id</code> jika tanpa simbol @.
+                </p>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Password
+                </label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                    <i data-lucide="key-round" class="w-4 h-4"></i>
+                  </span>
+                  <input
+                    type="password"
+                    name="password"
+                    required
+                    autocomplete="current-password"
+                    placeholder="Masukkan password Anda"
+                    class="w-full rounded-xl border border-slate-300 bg-slate-50 pl-10 pr-4 py-3 text-sm font-medium text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition"
+                  />
+                </div>
+              </div>
+
+              ${state.loginError ? `
+                <div class="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-start gap-2">
+                  <i data-lucide="alert-circle" class="w-4 h-4 shrink-0 mt-0.5 text-rose-600"></i>
+                  <span>${escapeHTML(state.loginError)}</span>
+                </div>
+              ` : ''}
+
+              <button
+                type="submit"
+                ${state.loginSubmitting ? 'disabled' : ''}
+                class="w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-bold text-sm shadow-lg shadow-indigo-600/25 transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                ${state.loginSubmitting
+                  ? `<span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>Memverifikasi Akun...</span>`
+                  : `<i data-lucide="log-in" class="w-4 h-4"></i><span>Masuk ke Sistem</span>`
+                }
+              </button>
+            </form>
+
+            <div class="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span class="text-slate-400">Pemisahan Hak Akses Otomatis</span>
+              <button
+style="display:none;"
+                type="button"
+                onclick="openSupabaseConfigModal()"
+                class="font-semibold text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-1 cursor-pointer"
+              >
+                <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+                <span>Pengaturan Koneksi Supabase</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // --- LAYAR BLOKIR ROLE (JIKA GURU/ADMIN MEMBUKA ?mode=siswa) ---
+    function renderRoleBlockedScreen() {
+      return `
+        <div class="max-w-lg mx-auto py-10">
+          <div class="bg-white rounded-3xl border border-rose-200 shadow-lg p-8 text-center">
+            <div class="w-16 h-16 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
+              <i data-lucide="shield-ban" class="w-8 h-8"></i>
+            </div>
+            <h2 class="text-xl font-extrabold text-slate-900 mb-2">Akses Mode Siswa Ditolak</h2>
+            <p class="text-sm text-slate-600 leading-relaxed mb-6">
+              Akun Anda terdaftar dengan peran <strong>${escapeHTML(state.profile.role.toUpperCase())}</strong> (${escapeHTML(state.profile.nama_lengkap)}). Demi integritas ujian, akun pengajar tidak diperbolehkan membuka parameter <code class="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-xs">?mode=siswa</code>.
+            </p>
+            <button
+              type="button"
+              onclick="returnToTeacherCleanUrl()"
+              class="w-full py-3 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md cursor-pointer"
+            >
+              Kembali ke Dashboard Guru
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // --- LAYAR 2: DASHBOARD GURU ---
+    function renderTeacherDashboard() {
+      const prof = state.profile;
+      const exam = getSelectedTeacherExam();
+      const t = state.teacher;
+
+      const totalBobot = t.questions.reduce((sum, q) => sum + (Number(q.bobot) || 0), 0);
+      const lockedCount = t.sessions.filter(s => s.status === 'terkunci').length;
+      const activeCount = t.sessions.filter(s => s.status === 'mengerjakan').length;
+      const finishedCount = t.sessions.filter(s => s.status === 'selesai').length;
+
+      let tabContentHTML = '';
+
+      if (!exam) {
+        tabContentHTML = `
+          <div class="bg-white rounded-3xl border border-slate-200 p-10 text-center shadow-sm">
+            <div class="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-4">
+              <i data-lucide="folder-plus" class="w-8 h-8"></i>
+            </div>
+            <h3 class="text-lg font-bold text-slate-900 mb-1">Belum Ada Paket Ujian</h3>
+            <p class="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mb-5">
+              Buat paket ujian pertama Anda untuk mulai mengunggah soal dari Microsoft Word (.docx) dan mengaktifkan token ujian bagi siswa.
+            </p>
+            <button
+              type="button"
+              onclick="state.teacher.showCreateExamForm = true; render();"
+              class="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md cursor-pointer"
+            >
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              <span>Buat Paket Ujian Baru</span>
+            </button>
+          </div>
+        `;
+      } else if (t.activeTab === 'questions') {
+        const preview = t.wordPreview;
+        tabContentHTML = `
+          <div class="space-y-6">
+            <!-- Panel Import Word (.docx) & Tambah Soal Manual -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
+              <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+                <div>
+                  <span class="px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold">
+                    Import Microsoft Word (.docx)
+                  </span>
+                  <h3 class="text-lg font-bold text-slate-900 mt-1">Kelola Bank Soal &amp; Gambar</h3>
+                  <p class="text-xs sm:text-sm text-slate-500">
+                    Unduh template tabel Word resmi, isi soal &amp; tempel gambar di MS Word, lalu unggah kembali ke sistem.
+                  </p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2.5">
+                  <button
+                    type="button"
+                    onclick="downloadWordTemplateDocx()"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold shadow-sm transition cursor-pointer"
+                  >
+                    <i data-lucide="file-down" class="w-4 h-4 text-emerald-400"></i>
+                    <span>Download Template Soal (.docx)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onclick="state.teacher.showManualForm = !state.teacher.showManualForm; render();"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold transition cursor-pointer"
+                  >
+                    <i data-lucide="plus-circle" class="w-4 h-4 text-indigo-600"></i>
+                    <span>${t.showManualForm ? 'Tutup Form Manual' : 'Tambah Soal Manual'}</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Dropzone Upload File .docx -->
+              <div class="pt-5">
+                <label class="border-2 border-dashed border-indigo-300 hover:border-indigo-500 bg-indigo-50/40 hover:bg-indigo-50/80 rounded-2xl p-5 flex flex-col sm:flex-row items-center gap-4 cursor-pointer transition">
+                  <div class="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-indigo-600/20">
+                    ${preview.uploadingImages
+                      ? `<span class="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></span>`
+                      : `<i data-lucide="upload-cloud" class="w-6 h-6"></i>`
+                    }
+                  </div>
+                  <div class="text-center sm:text-left flex-1">
+                    <div class="text-sm font-bold text-slate-900">
+                      ${preview.uploadingImages ? 'Mengekstrak Teks & Mengunggah Gambar ke Supabase Storage...' : 'Unggah File Microsoft Word (.docx)'}
+                    </div>
+                    <p class="text-xs text-slate-600 mt-0.5">
+                      Klik untuk memilih file <code class="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono text-[11px]">.docx</code>. Sistem otomatis mengekstrak tabel 8 kolom dan mengunggah gambar ke bucket <code class="font-mono text-indigo-700">gambar-soal</code>.
+                    </p>
+                  </div>
+                  <span class="px-4 py-2 rounded-xl bg-white border border-indigo-200 text-indigo-700 font-bold text-xs shadow-xs shrink-0">
+                    Pilih File .docx
+                  </span>
+                  <input type="file" accept=".docx" onchange="handleDocxUpload(event)" ${preview.uploadingImages ? 'disabled' : ''} class="hidden" />
+                </label>
+              </div>
+
+              <!-- Panel Pratinjau Hasil Ekstraksi Word sebelum Simpan ke Database -->
+              ${preview.items.length > 0 ? `
+                <div class="mt-6 rounded-2xl border-2 border-indigo-500 bg-indigo-50/30 p-5 space-y-4">
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-indigo-200">
+                    <div>
+                      <span class="px-2.5 py-0.5 rounded-full bg-indigo-600 text-white text-[11px] font-bold">Pratinjau Import Word</span>
+                      <h4 class="text-base font-bold text-slate-900 mt-1">
+                        ${escapeHTML(preview.fileName)} (${preview.items.length} Soal Siap Disimpan)
+                      </h4>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onclick="cancelWordPreview()"
+                        class="px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-semibold hover:bg-slate-50 cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="button"
+                        onclick="saveWordPreviewToDatabase()"
+                        ${preview.savingToDb ? 'disabled' : ''}
+                        class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-xs sm:text-sm font-bold shadow-sm inline-flex items-center gap-2 cursor-pointer"
+                      >
+                        <i data-lucide="database" class="w-4 h-4"></i>
+                        <span>${preview.savingToDb ? 'Menyimpan...' : `Simpan Semua ke Database (${preview.items.length})`}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="space-y-3 max-h-[460px] overflow-y-auto pr-1">
+                    ${preview.items.map((item, idx) => `
+                      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+                        <div class="flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-slate-100">
+                          <div class="flex flex-wrap items-center gap-2">
+                            <span class="px-2.5 py-0.5 rounded bg-indigo-600 text-white text-xs font-bold">#${idx + 1}</span>
+                            <div class="flex items-center gap-1 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-xs">
+                              <span class="font-semibold text-emerald-800">Kunci:</span>
+                              <select onchange="updateWordPreviewRow('${item.tempId}', 'kunci_jawaban', this.value)" class="bg-transparent font-bold text-emerald-900 focus:outline-none">
+                                ${['A', 'B', 'C', 'D'].map(k => `<option value="${k}" ${item.kunci_jawaban === k ? 'selected' : ''}>${k}</option>`).join('')}
+                              </select>
+                            </div>
+                            <div class="flex items-center gap-1 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded text-xs">
+                              <span class="font-semibold text-indigo-800">Bobot:</span>
+                              <input type="number" min="1" max="100" value="${item.bobot}" onchange="updateWordPreviewRow('${item.tempId}', 'bobot', this.value)" class="w-12 bg-white border border-indigo-200 rounded px-1 text-center font-bold text-indigo-900" />
+                            </div>
+                          </div>
+                          <button type="button" onclick="removeWordPreviewRow('${item.tempId}')" class="text-xs font-semibold text-rose-600 hover:underline cursor-pointer">
+                            Hapus Baris
+                          </button>
+                        </div>
+                        <p class="text-sm font-medium text-slate-800 mb-2.5">${escapeHTML(item.pertanyaan)}</p>
+                        ${item.gambar_url ? `
+                          <div class="mb-3 p-2 rounded-lg bg-slate-50 border border-slate-200 inline-block">
+                            <img src="${escapeHTML(item.gambar_url)}" alt="Gambar Soal" class="max-h-40 rounded object-contain" />
+                          </div>
+                        ` : ''}
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          ${['A', 'B', 'C', 'D'].map(opt => {
+                            const val = item[`opsi_${opt.toLowerCase()}`];
+                            const isKey = item.kunci_jawaban === opt;
+                            return `<div class="px-3 py-2 rounded-lg border ${isKey ? 'bg-emerald-50 border-emerald-300 font-semibold text-emerald-950' : 'bg-slate-50 border-slate-200 text-slate-700'}"><strong>${opt}.</strong> ${escapeHTML(val)}</div>`;
+                          }).join('')}
+                        </div>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              ` : ''}
+
+              <!-- Form Tambah Soal Manual -->
+              ${t.showManualForm ? `
+                <form onsubmit="handleAddManualQuestion(event)" class="mt-6 pt-6 border-t border-slate-200 bg-slate-50 p-5 rounded-2xl space-y-4">
+                  <h4 class="text-sm font-bold text-slate-900">Tambah Soal Satuan Manual</h4>
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Pertanyaan</label>
+                    <textarea name="pertanyaan" rows="2" required placeholder="Tuliskan pertanyaan ujian..." class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm focus:border-indigo-500 focus:outline-none"></textarea>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Gambar Pendukung (Opsional — diunggah ke bucket gambar-soal)</label>
+                    <input type="file" name="gambar_file" accept="image/*" class="block w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-xs font-semibold text-slate-700 mb-1">Opsi A</label>
+                      <input type="text" name="opsi_a" required class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-semibold text-slate-700 mb-1">Opsi B</label>
+                      <input type="text" name="opsi_b" required class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-semibold text-slate-700 mb-1">Opsi C</label>
+                      <input type="text" name="opsi_c" required class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-semibold text-slate-700 mb-1">Opsi D</label>
+                      <input type="text" name="opsi_d" required class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" />
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end">
+                    <div>
+                      <label class="block text-xs font-semibold text-slate-700 mb-1">Kunci Jawaban</label>
+                      <select name="kunci_jawaban" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-bold text-emerald-700">
+                        <option value="A">Kunci: A</option>
+                        <option value="B">Kunci: B</option>
+                        <option value="C">Kunci: C</option>
+                        <option value="D">Kunci: D</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs font-semibold text-slate-700 mb-1">Bobot Poin</label>
+                      <input type="number" name="bobot" min="1" max="100" value="10" required class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-bold text-indigo-700" />
+                    </div>
+                    <button type="submit" ${t.savingManualQuestion ? 'disabled' : ''} class="col-span-2 sm:col-span-1 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm cursor-pointer">
+                      ${t.savingManualQuestion ? 'Menyimpan...' : 'Simpan Soal'}
+                    </button>
+                  </div>
+                </form>
+              ` : ''}
+            </div>
+
+            <!-- Daftar Soal Tersimpan di Database -->
+            <div class="space-y-4">
+              <div class="flex flex-wrap items-center justify-between gap-2 px-1">
+                <h3 class="text-base font-bold text-slate-900">
+                  Daftar Soal Tersimpan (${t.questions.length} Butir)
+                </h3>
+                <span class="px-3 py-1 rounded-xl bg-indigo-100 text-indigo-800 text-xs font-bold">
+                  Total Bobot: ${totalBobot} Poin (Konversi Otomatis Skala 0–100)
+                </span>
+              </div>
+
+              ${t.loadingQuestions ? `
+                <div class="bg-white rounded-2xl border border-slate-200 p-8 text-center text-sm text-slate-500">
+                  Memuat daftar soal dari Supabase...
+                </div>
+              ` : t.questions.length === 0 ? `
+                <div class="bg-white rounded-2xl border border-slate-200 p-8 text-center text-sm text-slate-500">
+                  Belum ada soal pada paket ujian ini. Silakan unggah file Word (.docx) atau tambah soal manual di atas.
+                </div>
+              ` : t.questions.map((q, idx) => `
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+                  <div class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-100">
+                    <div class="flex items-center gap-2">
+                      <span class="px-2.5 py-1 rounded-lg bg-slate-900 text-white text-xs font-bold">No. ${idx + 1}</span>
+                      <span class="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold">Kunci: ${q.kunci_jawaban}</span>
+                      <span class="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-bold">Bobot: ${q.bobot}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onclick="confirmDeleteQuestion('${q.id}', ${idx + 1})"
+                      class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                      title="Hapus soal"
+                    >
+                      <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                  </div>
+
+                  <p class="text-sm font-medium text-slate-800 leading-relaxed mb-3">${escapeHTML(q.pertanyaan)}</p>
+
+                  ${q.gambar_url ? `
+                    <div class="mb-4 p-3 rounded-xl bg-slate-50 border border-slate-200 inline-block max-w-full">
+                      <img src="${escapeHTML(q.gambar_url)}" alt="Gambar Soal ${idx + 1}" onerror="this.src='https://placehold.co/400x200/e2e8f0/475569?text=Gambar+Tidak+Tersedia'" class="max-h-52 rounded-lg object-contain" />
+                    </div>
+                  ` : ''}
+
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                    ${['A', 'B', 'C', 'D'].map(optKey => {
+                      const val = q[`opsi_${optKey.toLowerCase()}`];
+                      const isCorrect = q.kunci_jawaban === optKey;
+                      return `
+                        <div class="px-3.5 py-2.5 rounded-xl border flex items-center gap-2.5 ${
+                          isCorrect ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-semibold' : 'bg-slate-50 border-slate-200 text-slate-700'
+                        }">
+                          <span class="w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
+                            isCorrect ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'
+                          }">${optKey}</span>
+                          <span>${escapeHTML(val)}</span>
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      } else if (t.activeTab === 'monitoring') {
+        const filteredSessions = t.sessions.filter(s => {
+          if (t.monitoringFilter === 'ALL') return true;
+          return s.status === t.monitoringFilter;
+        });
+
+        tabContentHTML = `
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="text-base font-bold text-slate-900">Monitoring Kehadiran &amp; Status Live</h3>
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping"></span>
+                    Realtime Aktif
+                  </span>
+                </div>
+                <p class="text-xs text-slate-500 mt-0.5">
+                  Perubahan status peserta otomatis diperbarui. Klik <strong>Reset Kunci</strong> jika siswa terkunci karena pelanggaran.
+                </p>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-1.5">
+                ${[
+                  { id: 'ALL', label: `Semua (${t.sessions.length})` },
+                  { id: 'mengerjakan', label: `Mengerjakan (${activeCount})` },
+                  { id: 'terkunci', label: `Terkunci (${lockedCount})` },
+                  { id: 'selesai', label: `Selesai (${finishedCount})` }
+                ].map(f => `
+                  <button
+                    type="button"
+                    onclick="state.teacher.monitoringFilter = '${f.id}'; render();"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                      t.monitoringFilter === f.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }"
+                  >${f.label}</button>
+                `).join('')}
+
+                <button
+                  type="button"
+                  onclick="loadTeacherMonitoringSessions('${exam.id}')"
+                  class="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
+                  title="Muat ulang manual"
+                >
+                  <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    <th class="py-3.5 px-4">Username / NIS</th>
+                    <th class="py-3.5 px-4">Nama Peserta</th>
+                    <th class="py-3.5 px-4">Kelas</th>
+                    <th class="py-3.5 px-4">Waktu Mulai</th>
+                    <th class="py-3.5 px-4">Status Live</th>
+                    <th class="py-3.5 px-4">Progres</th>
+                    <th class="py-3.5 px-4 text-right">Aksi Pengawas</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 text-sm">
+                  ${filteredSessions.length === 0 ? `
+                    <tr>
+                      <td colspan="7" class="py-10 text-center text-xs sm:text-sm text-slate-500">
+                        Belum ada peserta ujian untuk filter ini.
+                      </td>
+                    </tr>
+                  ` : filteredSessions.map(s => {
+                    const prof = s.profiles || {};
+                    const totalQ = t.questions.length;
+                    const ansCount = s.answeredCount || 0;
+                    const pct = totalQ > 0 ? Math.min(100, Math.round((ansCount / totalQ) * 100)) : 0;
+
+                    let badge = '';
+                    if (s.status === 'selesai') {
+                      badge = `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200"><span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>Selesai (${formatDateTimeID(s.waktu_selesai)})</span>`;
+                    } else if (s.status === 'terkunci') {
+                      badge = `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300 animate-pulse"><i data-lucide="shield-alert" class="w-3.5 h-3.5 text-rose-600"></i>TERKUNCI: ${escapeHTML(s.catatan_pelanggaran || 'Pelanggaran Layar')}</span>`;
+                    } else {
+                      badge = `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-200"><span class="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-ping"></span>Sedang Mengerjakan</span>`;
+                    }
+
+                    return `
+                      <tr class="hover:bg-slate-50/80 transition ${s.status === 'terkunci' ? 'bg-rose-50/50' : ''}">
+                        <td class="py-3.5 px-4 font-mono text-xs text-slate-600">${escapeHTML(prof.username || '-')}</td>
+                        <td class="py-3.5 px-4 font-semibold text-slate-900">${escapeHTML(prof.nama_lengkap || 'Siswa')}</td>
+                        <td class="py-3.5 px-4 text-xs text-slate-600">${escapeHTML(prof.kelas_atau_mapel || '-')}</td>
+                        <td class="py-3.5 px-4 font-mono text-xs text-slate-600">${formatDateTimeID(s.waktu_mulai)}</td>
+                        <td class="py-3.5 px-4">${badge}</td>
+                        <td class="py-3.5 px-4">
+                          <div class="w-28">
+                            <div class="flex justify-between text-[11px] font-semibold text-slate-600 mb-1">
+                              <span>${ansCount}/${totalQ}</span>
+                              <span>${pct}%</span>
+                            </div>
+                            <div class="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+                              <div class="h-full rounded-full ${s.status === 'selesai' ? 'bg-emerald-500' : 'bg-indigo-600'}" style="width: ${pct}%"></div>
+                            </div>
+                          </div>
+                        </td>
+                        <td class="py-3.5 px-4 text-right">
+                          ${s.status === 'terkunci' ? `
+                            <button
+                              type="button"
+                              onclick="resetStudentLock('${s.id}', '${escapeHTML(prof.nama_lengkap || 'Siswa')}')"
+                              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition cursor-pointer"
+                            >
+                              <i data-lucide="unlock" class="w-3.5 h-3.5"></i>
+                              <span>Reset Kunci</span>
+                            </button>
+                          ` : `<span class="text-xs text-slate-400">—</span>`}
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      } else {
+        // TAB 3: GENERATE & EXPORT NILAI EXCEL (.XLSX)
+        const finishedScores = t.sessions
+          .filter(s => s.status === 'selesai')
+          .map(s => Number(s.nilai_akhir || 0));
+
+        const avgScore = finishedScores.length > 0
+          ? (finishedScores.reduce((a, b) => a + b, 0) / finishedScores.length).toFixed(1)
+          : '0';
+        const maxScore = finishedScores.length > 0 ? Math.max(...finishedScores) : 0;
+        const minScore = finishedScores.length > 0 ? Math.min(...finishedScores) : 0;
+
+        tabContentHTML = `
+          <div class="space-y-5">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                <span class="text-xs font-semibold text-slate-500">Rata-Rata Nilai</span>
+                <div class="text-2xl font-extrabold text-indigo-600 mt-1">${avgScore}</div>
+                <span class="text-[11px] text-slate-400">Dari ${finishedScores.length} peserta selesai</span>
+              </div>
+              <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                <span class="text-xs font-semibold text-slate-500">Nilai Tertinggi</span>
+                <div class="text-2xl font-extrabold text-emerald-600 mt-1">${maxScore}</div>
+                <span class="text-[11px] text-slate-400">Skala maksimal 100</span>
+              </div>
+              <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                <span class="text-xs font-semibold text-slate-500">Nilai Terendah</span>
+                <div class="text-2xl font-extrabold text-rose-600 mt-1">${minScore}</div>
+                <span class="text-[11px] text-slate-400">Dihitung otomatis oleh server</span>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div class="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 class="text-base font-bold text-slate-900">Rekapitulasi Nilai Akhir Ujian</h3>
+                  <p class="text-xs text-slate-500 mt-0.5">
+                    Nilai akhir dihitung otomatis di sisi server berdasarkan bobot tiap soal saat siswa menyelesaikan ujian.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onclick="exportGradesToExcelXlsx()"
+                  class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-emerald-600/20 transition cursor-pointer shrink-0"
+                >
+                  <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                  <span>Export ke Excel (.xlsx)</span>
+                </button>
+              </div>
+
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      <th class="py-3.5 px-4">No</th>
+                      <th class="py-3.5 px-4">Username / NIS</th>
+                      <th class="py-3.5 px-4">Nama Peserta</th>
+                      <th class="py-3.5 px-4">Kelas</th>
+                      <th class="py-3.5 px-4">Status</th>
+                      <th class="py-3.5 px-4">Waktu Selesai</th>
+                      <th class="py-3.5 px-4">Nilai Akhir</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100 text-sm">
+                    ${t.sessions.length === 0 ? `
+                      <tr>
+                        <td colspan="7" class="py-10 text-center text-xs sm:text-sm text-slate-500">
+                          Belum ada peserta yang mengikuti ujian ini.
+                        </td>
+                      </tr>
+                    ` : t.sessions.map((s, idx) => {
+                      const prof = s.profiles || {};
+                      const score = Number(s.nilai_akhir || 0);
+                      return `
+                        <tr class="hover:bg-slate-50/80 transition">
+                          <td class="py-3.5 px-4 text-xs text-slate-500">${idx + 1}</td>
+                          <td class="py-3.5 px-4 font-mono text-xs text-slate-600">${escapeHTML(prof.username || '-')}</td>
+                          <td class="py-3.5 px-4 font-semibold text-slate-900">${escapeHTML(prof.nama_lengkap || '-')}</td>
+                          <td class="py-3.5 px-4 text-xs text-slate-600">${escapeHTML(prof.kelas_atau_mapel || '-')}</td>
+                          <td class="py-3.5 px-4 text-xs font-semibold ${
+                            s.status === 'selesai' ? 'text-emerald-600' : s.status === 'terkunci' ? 'text-rose-600' : 'text-indigo-600'
+                          }">
+                            ${s.status === 'selesai' ? 'Selesai' : s.status === 'terkunci' ? 'Terkunci' : 'Mengerjakan'}
+                          </td>
+                          <td class="py-3.5 px-4 font-mono text-xs text-slate-500">${formatDateTimeID(s.waktu_selesai)}</td>
+                          <td class="py-3.5 px-4">
+                            ${s.status === 'selesai'
+                              ? `<span class="text-base font-extrabold ${score >= 75 ? 'text-emerald-700' : 'text-rose-600'}">${score}</span>`
+                              : `<span class="text-xs text-slate-400">Menunggu selesai</span>`
+                            }
+                          </td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="space-y-6">
+          <!-- Bar Identitas Guru & Pemilih Paket Ujian -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div class="flex items-center gap-3.5">
+                <div class="w-12 h-12 rounded-2xl bg-indigo-600 text-white font-extrabold text-lg flex items-center justify-center shrink-0 shadow-md shadow-indigo-600/20">
+                  ${escapeHTML((prof.nama_lengkap || 'G').charAt(0).toUpperCase())}
+                </div>
+                <div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="text-lg font-extrabold text-slate-900">${escapeHTML(prof.nama_lengkap)}</h2>
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      ${escapeHTML(prof.kelas_atau_mapel || 'Pengampu Mata Pelajaran')}
+                    </span>
+                  </div>
+                  <p class="text-xs text-slate-500 mt-0.5">
+                    Username: <code class="font-mono text-slate-700">${escapeHTML(prof.username)}</code> • Isolasi Data Guru Aktif
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2.5">
+                ${t.exams.length > 0 ? `
+                  <select
+                    onchange="onTeacherExamChanged(this.value)"
+                    class="rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-xs sm:text-sm font-bold text-slate-800 focus:border-indigo-500 focus:outline-none max-w-xs"
+                  >
+                    ${t.exams.map(e => `
+                      <option value="${e.id}" ${e.id === t.selectedExamId ? 'selected' : ''}>
+                        ${escapeHTML(e.mapel)} — ${escapeHTML(e.judul_ujian)} ${e.is_active ? '(AKTIF)' : '(Nonaktif)'}
+                      </option>
+                    `).join('')}
+                  </select>
+                ` : ''}
+
+                <button
+                  type="button"
+                  onclick="state.teacher.showCreateExamForm = !state.teacher.showCreateExamForm; render();"
+                  class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm shadow-sm transition cursor-pointer"
+                >
+                  <i data-lucide="plus" class="w-4 h-4"></i>
+                  <span>Buat Paket Ujian Baru</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Form Buat Paket Ujian Baru (Kolapsibel) -->
+            ${t.showCreateExamForm ? `
+              <form onsubmit="handleCreateNewExam(event)" class="pt-4 border-t border-slate-200 bg-slate-50 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                <div class="sm:col-span-5">
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Judul Ujian</label>
+                  <input type="text" name="judul_ujian" required placeholder="Contoh: PTS Ganjil 2026" class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm" />
+                </div>
+                <div class="sm:col-span-3">
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Mata Pelajaran</label>
+                  <input type="text" name="mapel" required value="${escapeHTML(prof.kelas_atau_mapel || '')}" placeholder="Contoh: Matematika" class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm" />
+                </div>
+                <div class="sm:col-span-2">
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Durasi (Menit)</label>
+                  <input type="number" name="durasi_menit" min="5" max="300" value="60" required class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-bold" />
+                </div>
+                <div class="sm:col-span-2 flex gap-2">
+                  <button type="submit" ${t.creatingExam ? 'disabled' : ''} class="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm cursor-pointer">
+                    ${t.creatingExam ? '...' : 'Simpan'}
+                  </button>
+                  <button type="button" onclick="state.teacher.showCreateExamForm = false; render();" class="py-2.5 px-3 rounded-xl border border-slate-300 bg-white text-slate-600 text-xs font-semibold cursor-pointer">
+                    Batal
+                  </button>
+                </div>
+              </form>
+            ` : ''}
+
+            <!-- Kontrol Token & Status Aktif Ujian Terpilih -->
+            ${exam ? `
+              <div class="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex flex-wrap items-center gap-2.5">
+                  <div class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs">
+                    <span class="text-slate-400">Token Ujian:</span>
+                    <span class="font-mono text-base font-extrabold tracking-widest text-emerald-400">${escapeHTML(exam.token_ujian)}</span>
+                    <button type="button" onclick="copyTextSafe('${escapeHTML(exam.token_ujian)}')" class="p-1 rounded hover:bg-slate-800 text-slate-300 cursor-pointer" title="Salin Token">
+                      <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onclick="regenerateExamToken()"
+                    class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition cursor-pointer"
+                  >
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                    <span>Acak Ulang Token</span>
+                  </button>
+
+                  <span class="text-xs text-slate-500 px-2">
+                    Durasi: <strong>${exam.durasi_menit} Menit</strong>
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onclick="toggleExamActiveStatus()"
+                  class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    exam.is_active
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200'
+                      : 'bg-slate-200 text-slate-700 border border-slate-300 hover:bg-slate-300'
+                  }"
+                >
+                  <span class="w-2.5 h-2.5 rounded-full ${exam.is_active ? 'bg-emerald-600 animate-pulse' : 'bg-slate-500'}"></span>
+                  <span>${exam.is_active ? 'Status: UJIAN AKTIF (Klik untuk Nonaktifkan)' : 'Status: NONAKTIF (Klik untuk Aktifkan)'}</span>
+                </button>
+<button
+                  type="button"
+                  onclick="confirmDeleteSelectedExam()"
+                  class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition cursor-pointer"
+                >
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                  <span>Hapus Paket</span>
+                </button>
+              </div>
+            ` : ''}
+          </div>
+
+          ${exam ? `
+            <!-- 3 Tab Navigasi Utama Guru -->
+            <div class="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+              <button
+                type="button"
+                onclick="state.teacher.activeTab = 'questions'; render();"
+                class="py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+                  t.activeTab === 'questions' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+                }"
+              >
+                <i data-lucide="file-text" class="w-4 h-4"></i>
+                <span>Bank Soal &amp; Import Word (${t.questions.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onclick="state.teacher.activeTab = 'monitoring'; render();"
+                class="py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+                  t.activeTab === 'monitoring' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+                }"
+              >
+                <i data-lucide="activity" class="w-4 h-4"></i>
+                <span>Monitoring Live (${t.sessions.length})</span>
+                ${lockedCount > 0 ? `<span class="px-1.5 py-0.2 rounded-full text-[11px] bg-rose-500 text-white">${lockedCount}</span>` : ''}
+              </button>
+
+              <button
+                type="button"
+                onclick="state.teacher.activeTab = 'grades'; render();"
+                class="py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+                  t.activeTab === 'grades' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+                }"
+              >
+                <i data-lucide="award" class="w-4 h-4"></i>
+                <span>Generate &amp; Export Nilai</span>
+              </button>
+            </div>
+          ` : ''}
+
+          <!-- Konten Tab -->
+          ${tabContentHTML}
+        </div>
+      `;
+    }
+
+    // --- LAYAR 3: PORTAL UJIAN SISWA ---
+    function renderStudentPortal() {
+      const prof = state.profile;
+      const st = state.student;
+
+      // LANGKAH 1: PILIH UJIAN AKTIF & MASUKKAN TOKEN
+      if (st.step === 'select_exam') {
+        return `
+          <div class="max-w-xl mx-auto py-2 sm:py-6">
+            <div class="bg-white rounded-3xl border border-slate-200 shadow-lg overflow-hidden">
+              <div class="bg-slate-900 text-white px-6 py-5">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold">
+                    Portal Peserta Ujian
+                  </span>
+                  <span class="text-xs font-mono text-slate-400">${escapeHTML(prof.username)}</span>
+                </div>
+                <h2 class="text-xl font-extrabold">${escapeHTML(prof.nama_lengkap)}</h2>
+                <p class="text-xs text-slate-400 mt-0.5">Kelas: ${escapeHTML(prof.kelas_atau_mapel || '-')}</p>
+              </div>
+
+              <div class="p-6">
+                ${st.loadingExams ? `
+                  <div class="py-10 text-center text-sm text-slate-500">
+                    Memuat jadwal ujian yang sedang aktif...
+                  </div>
+                ` : st.activeExams.length === 0 ? `
+                  <div class="py-8 text-center">
+                    <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                      <i data-lucide="calendar-off" class="w-6 h-6"></i>
+                    </div>
+                    <h3 class="text-base font-bold text-slate-800 mb-1">Belum Ada Ujian Aktif</h3>
+                    <p class="text-xs text-slate-500 mb-4">Tunggu hingga guru mengaktifkan sesi ujian, lalu tekan tombol muat ulang.</p>
+                    <button type="button" onclick="loadActiveExamsForStudent()" class="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold cursor-pointer">
+                      Muat Ulang Jadwal
+                    </button>
+                  </div>
+                ` : `
+                  <form onsubmit="handleStudentJoinExam(event)" class="space-y-5">
+                    <div>
+                      <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+                        1. Pilih Ujian yang Sedang Berlangsung
+                      </label>
+                      <div class="space-y-2.5">
+                        ${st.activeExams.map((ex, i) => {
+                          const existingSess = st.existingSessionsMap[ex.id];
+                          let badge = `<span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[11px] font-bold">Tersedia</span>`;
+                          if (existingSess) {
+                            if (existingSess.status === 'selesai') {
+                              badge = `<span class="px-2 py-0.5 rounded bg-slate-200 text-slate-700 text-[11px] font-bold">Selesai (Nilai: ${existingSess.nilai_akhir})</span>`;
+                            } else if (existingSess.status === 'terkunci') {
+                              badge = `<span class="px-2 py-0.5 rounded bg-rose-100 text-rose-700 text-[11px] font-bold">Terkunci Pengawas</span>`;
+                            } else {
+                              badge = `<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[11px] font-bold">Lanjutkan Sesi</span>`;
+                            }
+                          }
+
+                          return `
+                            <label class="block p-4 rounded-2xl border-2 border-slate-200 hover:border-indigo-400 has-[:checked]:border-indigo-600 has-[:checked]:bg-indigo-50/50 cursor-pointer transition">
+                              <div class="flex items-start gap-3">
+                                <input type="radio" name="exam_id" value="${ex.id}" ${i === 0 ? 'checked' : ''} class="mt-1 text-indigo-600 focus:ring-indigo-500" />
+                                <div class="flex-1">
+                                  <div class="flex flex-wrap items-center justify-between gap-1">
+                                    <span class="text-sm font-bold text-slate-900">${escapeHTML(ex.mapel)}</span>
+                                    ${badge}
+                                  </div>
+                                  <div class="text-xs text-slate-600 mt-0.5">${escapeHTML(ex.judul_ujian)}</div>
+                                  <div class="text-[11px] text-slate-400 mt-1">Durasi pengerjaan: ${ex.durasi_menit} Menit</div>
+                                </div>
+                              </div>
+                            </label>
+                          `;
+                        }).join('')}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                        2. Masukkan Token Ujian (6 Karakter)
+                      </label>
+                      <input
+                        type="text"
+                        name="token_ujian"
+                        maxlength="6"
+                        required
+                        placeholder="XXXXXX"
+                        class="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-center font-mono text-xl font-extrabold tracking-[0.3em] uppercase text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none"
+                      />
+                    </div>
+
+                    <div class="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 leading-relaxed flex items-start gap-2.5">
+                      <i data-lucide="shield-alert" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i>
+                      <span>
+                        <strong>Perhatian:</strong> Setelah menekan mulai, jangan berpindah tab, membuka split-screen, atau memanggil Google Lens karena layar akan otomatis terkunci.
+                      </span>
+                    </div>
+
+                    <button
+                      type="submit"
+                      class="w-full py-3.5 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-lg shadow-indigo-600/25 transition flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <span>Mulai Mengerjakan Ujian</span>
+                      <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </button>
+                  </form>
+                `}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      // LAYAR TERKUNCI PELANGGARAN (MERAH PENUH)
+      if (st.step === 'locked') {
+        return `
+          <div class="fixed inset-0 z-50 bg-rose-950 text-white flex items-center justify-center p-5 overflow-y-auto">
+            <div class="max-w-md w-full text-center">
+              <div class="w-20 h-20 rounded-full bg-rose-500/20 border-2 border-rose-400 flex items-center justify-center mx-auto mb-5 animate-pulse">
+                <i data-lucide="shield-off" class="w-10 h-10 text-rose-400"></i>
+              </div>
+              <span class="px-3 py-1 rounded-full bg-rose-500/30 border border-rose-400/50 text-rose-200 text-xs font-bold uppercase tracking-wider">
+                Pelanggaran Keamanan Layar
+              </span>
+              <h2 class="text-2xl sm:text-3xl font-extrabold mt-3 mb-2">LAYAR UJIAN TERKUNCI!</h2>
+              <p class="text-sm text-rose-100 leading-relaxed mb-6">
+                Sistem mendeteksi Anda meninggalkan layar ujian atau membuka aplikasi lain. Laporan otomatis terkirim ke pengawas ruang.
+              </p>
+
+              <div class="bg-rose-900/70 border border-rose-700 rounded-2xl p-4 text-left text-xs space-y-2 mb-6">
+                <div class="flex justify-between">
+                  <span class="text-rose-300">Peserta:</span>
+                  <span class="font-bold">${escapeHTML(prof.nama_lengkap)}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-rose-300">Ujian:</span>
+                  <span class="font-semibold">${escapeHTML(st.selectedExam ? st.selectedExam.mapel : '-')}</span>
+                </div>
+                <div class="pt-1 border-t border-rose-800 text-amber-300">
+                  Catatan: ${escapeHTML((st.session && st.session.catatan_pelanggaran) || 'Kehilangan fokus layar')}
+                </div>
+              </div>
+
+              <p class="text-xs text-rose-200 mb-4">
+                Silakan melapor kepada pengawas ruang. Layar ini akan <strong>terbuka otomatis</strong> begitu pengawas menekan tombol <em>Reset Kunci</em>.
+              </p>
+
+              <button
+                type="button"
+                onclick="checkStudentUnlockStatusManual()"
+                class="w-full py-3 px-4 rounded-xl bg-white text-rose-950 hover:bg-rose-50 font-bold text-xs sm:text-sm shadow-lg transition cursor-pointer"
+              >
+                Cek Status Kunci Sekarang
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      // LAYAR SELESAI & HASIL NILAI DARI SERVER
+      if (st.step === 'finished') {
+        const finalScore = st.finalGradeResult !== null ? st.finalGradeResult : (st.session ? st.session.nilai_akhir : 0);
+        return `
+          <div class="max-w-lg mx-auto py-4 sm:py-8">
+            <div class="bg-white rounded-3xl border border-slate-200 shadow-lg p-6 sm:p-8 text-center">
+              <div class="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-4">
+                <i data-lucide="check-circle-2" class="w-9 h-9"></i>
+              </div>
+              <span class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">
+                Jawaban Terkumpul &amp; Terverifikasi
+              </span>
+              <h2 class="text-2xl font-extrabold text-slate-900 mt-2 mb-1">Ujian Telah Selesai</h2>
+              <p class="text-xs sm:text-sm text-slate-500 mb-6">
+                Terima kasih, <strong>${escapeHTML(prof.nama_lengkap)}</strong>. Nilai akhir Anda telah dikalkulasi otomatis oleh server sekolah.
+              </p>
+
+              <div class="p-6 rounded-2xl bg-slate-900 text-white mb-6">
+                <div class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Nilai Akhir Anda</div>
+                <div class="text-5xl font-extrabold text-emerald-400 mt-1">${finalScore}</div>
+                <div class="text-xs text-slate-400 mt-2">${escapeHTML(st.selectedExam ? `${st.selectedExam.mapel} — ${st.selectedExam.judul_ujian}` : '')}</div>
+              </div>
+
+              <button
+                type="button"
+                onclick="backToStudentExamList()"
+                class="w-full py-3 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-sm cursor-pointer"
+              >
+                Kembali ke Daftar Ujian
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      // LANGKAH 2: LAYAR PENGERJAAN SOAL AKTIF
+      const currentQ = st.questions[st.currentIndex];
+      if (!currentQ) return '';
+
+      const selectedOpt = st.answersMap[currentQ.id] || null;
+      const isDoubtful = Boolean(st.doubtfulMap[currentQ.id]);
+      const answeredCount = st.questions.filter(q => Boolean(st.answersMap[q.id])).length;
+
+      return `
+        <div class="exam-no-select max-w-5xl mx-auto space-y-4">
+          <!-- Bar Status Ujian & Timer -->
+          <div class="bg-slate-900 text-white rounded-2xl px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3 shadow-md">
+            <div>
+              <div class="flex items-center gap-2 text-[11px] font-bold text-emerald-400">
+                <i data-lucide="shield-check" class="w-4 h-4"></i>
+                <span>Mode Ujian Terproteksi Aktif</span>
+              </div>
+              <h2 class="text-sm sm:text-base font-extrabold mt-0.5">
+                ${escapeHTML(st.selectedExam.mapel)} — ${escapeHTML(st.selectedExam.judul_ujian)}
+              </h2>
+            </div>
+
+            <div class="flex items-center gap-3">
+              ${st.lastSavedText ? `<span class="hidden md:inline text-[11px] text-slate-400">${escapeHTML(st.lastSavedText)}</span>` : ''}
+              <div class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 font-mono text-base font-extrabold text-amber-400">
+                <i data-lucide="clock" class="w-4 h-4"></i>
+                <span id="student-timer-display">${formatCountdown(st.remainingSeconds)}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Grid Area Soal & Navigasi Nomor -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <!-- Kartu Pertanyaan (8 kolom) -->
+            <div class="lg:col-span-8 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+                  <span class="px-3 py-1 rounded-lg bg-indigo-600 text-white text-xs font-bold">
+                    Soal No. ${st.currentIndex + 1} dari ${st.questions.length}
+                  </span>
+                  <span class="text-xs font-medium text-slate-400">
+                    ${st.savingAnswerId === currentQ.id ? 'Menyimpan...' : selectedOpt ? `Terpilih: ${selectedOpt}` : 'Belum dijawab'}
+                  </span>
+                </div>
+
+                <p class="text-sm sm:text-base font-medium text-slate-800 leading-relaxed mb-4">
+                  ${escapeHTML(currentQ.pertanyaan)}
+                </p>
+
+                ${currentQ.gambar_url ? `
+                  <div class="mb-5 p-3 rounded-2xl bg-slate-50 border border-slate-200 inline-block max-w-full">
+                    <img src="${escapeHTML(currentQ.gambar_url)}" alt="Gambar Soal" onerror="this.src='https://placehold.co/400x200/e2e8f0/475569?text=Gambar+Soal'" class="max-h-60 rounded-xl object-contain" />
+                  </div>
+                ` : ''}
+
+                <!-- Pilihan Ganda A - D -->
+                <div class="space-y-3">
+                  ${['A', 'B', 'C', 'D'].map(optKey => {
+                    const textVal = currentQ[`opsi_${optKey.toLowerCase()}`];
+                    const isSelected = selectedOpt === optKey;
+                    return `
+                      <button
+                        type="button"
+                        onclick="handleStudentSelectAnswer('${currentQ.id}', '${optKey}')"
+                        class="w-full text-left p-3.5 sm:p-4 rounded-xl border-2 transition-all flex items-center gap-3.5 cursor-pointer ${
+                          isSelected
+                            ? 'border-indigo-600 bg-indigo-50/80 shadow-xs'
+                            : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50'
+                        }"
+                      >
+                        <span class="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 ${
+                          isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700'
+                        }">${optKey}</span>
+                        <span class="text-sm ${isSelected ? 'font-semibold text-indigo-950' : 'text-slate-700'}">
+                          ${escapeHTML(textVal)}
+                        </span>
+                      </button>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+
+              <!-- Navigasi Bawah Soal -->
+              <div class="pt-6 mt-6 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5">
+                <button
+                  type="button"
+                  onclick="goToStudentQuestionIndex(${st.currentIndex - 1})"
+                  ${st.currentIndex === 0 ? 'disabled' : ''}
+                  class="px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1.5 cursor-pointer"
+                >
+                  <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                  <span>Sebelumnya</span>
+                </button>
+
+                <button
+                  type="button"
+                  onclick="toggleStudentDoubtful('${currentQ.id}')"
+                  class="px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm font-semibold flex items-center gap-1.5 cursor-pointer ${
+                    isDoubtful
+                      ? 'bg-amber-400 border-amber-500 text-amber-950'
+                      : 'bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100'
+                  }"
+                >
+                  <input type="checkbox" ${isDoubtful ? 'checked' : ''} class="rounded pointer-events-none" />
+                  <span>Ragu-ragu</span>
+                </button>
+
+                ${st.currentIndex < st.questions.length - 1 ? `
+                  <button
+                    type="button"
+                    onclick="goToStudentQuestionIndex(${st.currentIndex + 1})"
+                    class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  >
+                    <span>Selanjutnya</span>
+                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                  </button>
+                ` : `
+                  <button
+                    type="button"
+                    onclick="promptStudentFinishExam()"
+                    ${st.submittingExam ? 'disabled' : ''}
+                    class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  >
+                    <i data-lucide="check" class="w-4 h-4"></i>
+                    <span>${st.submittingExam ? 'Mengumpulkan...' : 'Selesai & Kumpulkan'}</span>
+                  </button>
+                `}
+              </div>
+            </div>
+
+            <!-- Panel Navigasi Nomor Soal (4 kolom) -->
+            <div class="lg:col-span-4 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col justify-between gap-5">
+              <div>
+                <div class="flex items-center justify-between mb-3">
+                  <span class="text-xs font-bold uppercase tracking-wider text-slate-600">Navigasi Nomor</span>
+                  <span class="text-xs font-bold text-indigo-600">${answeredCount}/${st.questions.length} Terjawab</span>
+                </div>
+
+                <div class="grid grid-cols-5 gap-2 mb-5">
+                  ${st.questions.map((q, idx) => {
+                    const isAns = Boolean(st.answersMap[q.id]);
+                    const isRagu = Boolean(st.doubtfulMap[q.id]);
+                    const isCurr = idx === st.currentIndex;
+
+                    let style = 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200';
+                    if (isRagu) style = 'bg-amber-400 text-amber-950 border-amber-500';
+                    else if (isAns) style = 'bg-emerald-500 text-white border-emerald-600';
+
+                    return `
+                      <button
+                        type="button"
+                        onclick="goToStudentQuestionIndex(${idx})"
+                        class="h-10 rounded-xl border font-bold text-xs flex items-center justify-center transition cursor-pointer ${style} ${
+                          isCurr ? 'ring-2 ring-indigo-600 ring-offset-2' : ''
+                        }"
+                      >${idx + 1}</button>
+                    `;
+                  }).join('')}
+                </div>
+
+                <div class="flex flex-wrap gap-3 text-[11px] text-slate-500 mb-5">
+                  <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-emerald-500 inline-block"></span>Dijawab</span>
+                  <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-amber-400 inline-block"></span>Ragu-ragu</span>
+                  <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-slate-200 inline-block"></span>Kosong</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onclick="promptStudentFinishExam()"
+                ${st.submittingExam ? 'disabled' : ''}
+                class="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold text-xs sm:text-sm shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <i data-lucide="send" class="w-4 h-4"></i>
+                <span>${st.submittingExam ? 'Menghitung Nilai...' : 'Selesai & Kumpulkan'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // --- RENDER UTAMA ---
+    function render() {
+      renderHeaderActions();
+      const root = document.getElementById('app-root');
+      if (!root) return;
+
+      if (state.screen === 'login') {
+        root.innerHTML = renderLoginScreen();
+      } else if (state.screen === 'role_blocked') {
+        root.innerHTML = renderRoleBlockedScreen();
+      } else if (state.screen === 'teacher') {
+        root.innerHTML = renderTeacherDashboard();
+      } else if (state.screen === 'student') {
+        root.innerHTML = renderStudentPortal();
+      }
+
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+    }
+
+    // Inisialisasi Aplikasi saat DOM siap
+    window.addEventListener('DOMContentLoaded', async () => {
+      initSupabaseClient();
+      await bootstrapAuthSession();
+    });
+  </script>
+</body>
+</html>
