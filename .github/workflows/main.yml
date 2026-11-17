@@ -5,6 +5,10 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+env:
+  EXAM_URL: "https://GANTI-DENGAN-LINK-NETLIFY-KAMU.netlify.app"
+  EXIT_PIN: "202699"
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -27,12 +31,107 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Perbaiki Ikon & Cek Struktur Proyek
+      - name: Generate Struktur Proyek Android Lengkap
         run: |
-          if [ -f "EduShield-ExamBrowser/build.gradle.kts" ]; then
-            cd EduShield-ExamBrowser
-          fi
+          mkdir -p app/src/main/java/id/sch/edushield/exambrowser
+          mkdir -p app/src/main/res/layout
+          mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/drawable
+
+          cat << 'EOF' > settings.gradle.kts
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "EduShieldExamBrowser"
+          include(":app")
+          EOF
+
+          cat << 'EOF' > build.gradle.kts
+          plugins {
+              id("com.android.application") version "8.5.2" apply false
+              id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+          }
+          EOF
+
+          cat << 'EOF' > gradle.properties
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          kotlin.code.style=official
+          android.nonTransitiveRClass=true
+          EOF
+
+          cat << 'EOF' > app/build.gradle.kts
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+          }
+
+          android {
+              namespace = "id.sch.edushield.exambrowser"
+              compileSdk = 34
+
+              defaultConfig {
+                  applicationId = "id.sch.edushield.exambrowser"
+                  minSdk = 24
+                  targetSdk = 34
+                  versionCode = 1
+                  versionName = "1.0.0"
+              }
+
+              buildTypes {
+                  release {
+                      isMinifyEnabled = false
+                  }
+              }
+
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+          }
+
+          dependencies {
+              implementation("androidx.core:core-ktx:1.13.1")
+              implementation("androidx.appcompat:appcompat:1.7.0")
+              implementation("com.google.android.material:material:1.12.0")
+              implementation("androidx.webkit:webkit:1.11.0")
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/res/values/strings.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="app_name">EduShield Exam Browser</string>
+          </resources>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/values/themes.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="Theme.EduShieldExamBrowser" parent="Theme.Material3.DayNight.NoActionBar">
+                  <item name="colorPrimary">#1E1B4B</item>
+                  <item name="colorPrimaryVariant">#0F172A</item>
+                  <item name="colorOnPrimary">#FFFFFF</item>
+                  <item name="android:windowFullscreen">true</item>
+              </style>
+          </resources>
+          EOF
+
           cat << 'EOF' > app/src/main/res/drawable/ic_launcher.xml
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -48,18 +147,483 @@ jobs:
                   android:pathData="M54,24L30,34v18c0,15.5 10.2,30 24,34c13.8,-4 24,-18.5 24,-34V34L54,24zM50,62l-10,-10l3.5,-3.5L50,55l14.5,-14.5L68,44L50,62z" />
           </vector>
           EOF
-          sed -i 's/@mipmap\/ic_launcher_round/@drawable\/ic_launcher/g' app/src/main/AndroidManifest.xml
-          sed -i 's/@mipmap\/ic_launcher/@drawable\/ic_launcher/g' app/src/main/AndroidManifest.xml
+
+          cat << 'EOF' > app/src/main/AndroidManifest.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+              <application
+                  android:allowBackup="false"
+                  android:icon="@drawable/ic_launcher"
+                  android:label="@string/app_name"
+                  android:roundIcon="@drawable/ic_launcher"
+                  android:supportsRtl="true"
+                  android:theme="@style/Theme.EduShieldExamBrowser"
+                  android:usesCleartextTraffic="false">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:configChanges="orientation|screenSize|keyboardHidden"
+                      android:excludeFromRecents="true"
+                      android:exported="true"
+                      android:launchMode="singleTask"
+                      android:lockTaskMode="if_whitelisted"
+                      android:screenOrientation="portrait">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+
+              </application>
+
+          </manifest>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/layout/activity_main.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:background="#0F172A"
+              android:orientation="vertical">
+
+              <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="48dp"
+                  android:background="#0F172A"
+                  android:gravity="center_vertical"
+                  android:orientation="horizontal"
+                  android:paddingStart="12dp"
+                  android:paddingEnd="12dp">
+
+                  <TextView
+                      android:id="@+id/tvLockStatus"
+                      android:layout_width="0dp"
+                      android:layout_height="wrap_content"
+                      android:layout_weight="1"
+                      android:text="🔒 MODE UJIAN TERPROTEKSI"
+                      android:textColor="#34D399"
+                      android:textSize="12sp"
+                      android:textStyle="bold" />
+
+                  <Button
+                      android:id="@+id/btnReload"
+                      android:layout_width="wrap_content"
+                      android:layout_height="36dp"
+                      android:layout_marginEnd="6dp"
+                      android:backgroundTint="#1E293B"
+                      android:minWidth="0dp"
+                      android:paddingStart="10dp"
+                      android:paddingEnd="10dp"
+                      android:text="Muat Ulang"
+                      android:textAllCaps="false"
+                      android:textColor="#E2E8F0"
+                      android:textSize="11sp" />
+
+                  <Button
+                      android:id="@+id/btnExitExam"
+                      android:layout_width="wrap_content"
+                      android:layout_height="36dp"
+                      android:backgroundTint="#E11D48"
+                      android:minWidth="0dp"
+                      android:paddingStart="12dp"
+                      android:paddingEnd="12dp"
+                      android:text="Keluar"
+                      android:textAllCaps="false"
+                      android:textColor="#FFFFFF"
+                      android:textSize="11sp"
+                      android:textStyle="bold" />
+              </LinearLayout>
+
+              <ProgressBar
+                  android:id="@+id/progressBar"
+                  style="?android:attr/progressBarStyleHorizontal"
+                  android:layout_width="match_parent"
+                  android:layout_height="3dp"
+                  android:max="100"
+                  android:progressTint="#6366F1"
+                  android:visibility="gone" />
+
+              <FrameLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="0dp"
+                  android:layout_weight="1">
+
+                  <WebView
+                      android:id="@+id/examWebView"
+                      android:layout_width="match_parent"
+                      android:layout_height="match_parent" />
+
+                  <LinearLayout
+                      android:id="@+id/securityOverlay"
+                      android:layout_width="match_parent"
+                      android:layout_height="match_parent"
+                      android:background="#881337"
+                      android:gravity="center"
+                      android:orientation="vertical"
+                      android:padding="24dp"
+                      android:visibility="gone">
+
+                      <TextView
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="⚠️ PERINGATAN KEAMANAN"
+                          android:textColor="#FDE047"
+                          android:textSize="18sp"
+                          android:textStyle="bold" />
+
+                      <TextView
+                          android:id="@+id/tvOverlayMessage"
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="12dp"
+                          android:gravity="center"
+                          android:lineSpacingExtra="4dp"
+                          android:text="Aplikasi ujian wajib disematkan (Pin App) agar notifikasi dan aplikasi lain terkunci sepenuhnya selama ujian berlangsung."
+                          android:textColor="#FFFFFF"
+                          android:textSize="14sp" />
+
+                      <Button
+                          android:id="@+id/btnResumeExam"
+                          android:layout_width="match_parent"
+                          android:layout_height="48dp"
+                          android:layout_marginTop="24dp"
+                          android:backgroundTint="#FFFFFF"
+                          android:text="Kunci Layar &amp; Lanjutkan Ujian"
+                          android:textAllCaps="false"
+                          android:textColor="#881337"
+                          android:textSize="14sp"
+                          android:textStyle="bold" />
+                  </LinearLayout>
+
+              </FrameLayout>
+
+          </LinearLayout>
+          EOF
+
+          if [ -f "EduShield-ExamBrowser/app/src/main/java/id/sch/edushield/exambrowser/MainActivity.kt" ]; then
+            cp "EduShield-ExamBrowser/app/src/main/java/id/sch/edushield/exambrowser/MainActivity.kt" app/src/main/java/id/sch/edushield/exambrowser/MainActivity.kt
+          elif [ ! -f "app/src/main/java/id/sch/edushield/exambrowser/MainActivity.kt" ]; then
+            cat << 'EOF' > app/src/main/java/id/sch/edushield/exambrowser/MainActivity.kt
+          package id.sch.edushield.exambrowser
+
+          import android.annotation.SuppressLint
+          import android.app.ActivityManager
+          import android.content.Context
+          import android.media.AudioManager
+          import android.media.ToneGenerator
+          import android.net.Uri
+          import android.os.Bundle
+          import android.text.InputType
+          import android.view.View
+          import android.view.WindowManager
+          import android.webkit.CookieManager
+          import android.webkit.WebChromeClient
+          import android.webkit.WebResourceRequest
+          import android.webkit.WebSettings
+          import android.webkit.WebView
+          import android.webkit.WebViewClient
+          import android.widget.Button
+          import android.widget.EditText
+          import android.widget.LinearLayout
+          import android.widget.ProgressBar
+          import android.widget.TextView
+          import android.widget.Toast
+          import androidx.activity.OnBackPressedCallback
+          import androidx.appcompat.app.AlertDialog
+          import androidx.appcompat.app.AppCompatActivity
+          import androidx.core.view.WindowCompat
+          import androidx.core.view.WindowInsetsCompat
+          import androidx.core.view.WindowInsetsControllerCompat
+
+          class MainActivity : AppCompatActivity() {
+
+              companion object {
+                  private const val DEFAULT_EXAM_URL = "https://GANTI-DENGAN-LINK-NETLIFY-KAMU.netlify.app"
+                  private const val PROCTOR_EXIT_PIN = "202699"
+                  private const val PREFS_NAME = "edushield_exam_prefs"
+                  private const val KEY_SAVED_URL = "saved_exam_url"
+              }
+
+              private lateinit var webView: WebView
+              private lateinit var progressBar: ProgressBar
+              private lateinit var tvLockStatus: TextView
+              private lateinit var securityOverlay: LinearLayout
+              private lateinit var tvOverlayMessage: TextView
+              private lateinit var btnResumeExam: Button
+              private lateinit var btnReload: Button
+              private lateinit var btnExitExam: Button
+
+              private var isAuthorizedExit = false
+              private var activeExamUrl: String = DEFAULT_EXAM_URL
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+
+                  window.setFlags(
+                      WindowManager.LayoutParams.FLAG_SECURE,
+                      WindowManager.LayoutParams.FLAG_SECURE
+                  )
+                  window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+                  setContentView(R.layout.activity_main)
+                  hideSystemBars()
+
+                  webView = findViewById(R.id.examWebView)
+                  progressBar = findViewById(R.id.progressBar)
+                  tvLockStatus = findViewById(R.id.tvLockStatus)
+                  securityOverlay = findViewById(R.id.securityOverlay)
+                  tvOverlayMessage = findViewById(R.id.tvOverlayMessage)
+                  btnResumeExam = findViewById(R.id.btnResumeExam)
+                  btnReload = findViewById(R.id.btnReload)
+                  btnExitExam = findViewById(R.id.btnExitExam)
+
+                  onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+                      override fun handleOnBackPressed() {
+                          Toast.makeText(
+                              this@MainActivity,
+                              "Tombol kembali dinonaktifkan. Gunakan tombol Keluar + PIN Pengawas.",
+                              Toast.LENGTH_SHORT
+                          ).show()
+                      }
+                  })
+
+                  setupWebView()
+                  setupButtons()
+
+                  val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                  val savedUrl = prefs.getString(KEY_SAVED_URL, null)
+
+                  if (!DEFAULT_EXAM_URL.contains("GANTI-DENGAN-LINK-NETLIFY-KAMU")) {
+                      activeExamUrl = DEFAULT_EXAM_URL.trim()
+                      startExamSession()
+                  } else if (!savedUrl.isNullOrBlank()) {
+                      activeExamUrl = savedUrl
+                      startExamSession()
+                  } else {
+                      showInitialUrlSetupDialog()
+                  }
+              }
+
+              private fun startExamSession() {
+                  activateScreenPinning()
+                  webView.loadUrl(activeExamUrl)
+              }
+
+              @SuppressLint("SetJavaScriptEnabled")
+              private fun setupWebView() {
+                  val cookieManager = CookieManager.getInstance()
+                  cookieManager.setAcceptCookie(true)
+                  cookieManager.setAcceptThirdPartyCookies(webView, true)
+
+                  webView.settings.apply {
+                      javaScriptEnabled = true
+                      domStorageEnabled = true
+                      databaseEnabled = true
+                      cacheMode = WebSettings.LOAD_DEFAULT
+                      useWideViewPort = true
+                      loadWithOverviewMode = true
+                      setSupportZoom(false)
+                      builtInZoomControls = false
+                      displayZoomControls = false
+                      allowFileAccess = false
+                      allowContentAccess = false
+                      mediaPlaybackRequiresUserGesture = false
+                  }
+
+                  webView.setOnLongClickListener { true }
+                  webView.isLongClickable = false
+                  webView.isHapticFeedbackEnabled = false
+
+                  webView.webViewClient = object : WebViewClient() {
+                      override fun shouldOverrideUrlLoading(
+                          view: WebView?,
+                          request: WebResourceRequest?
+                      ): Boolean {
+                          val targetUri = request?.url ?: return true
+                          val allowedHost = Uri.parse(activeExamUrl).host ?: ""
+                          val targetHost = targetUri.host ?: ""
+                          if (targetHost == allowedHost || targetHost.endsWith(".supabase.co")) {
+                              return false
+                          }
+                          Toast.makeText(
+                              this@MainActivity,
+                              "Akses ke situs luar ($targetHost) diblokir sistem ujian!",
+                              Toast.LENGTH_SHORT
+                          ).show()
+                          return true
+                      }
+                  }
+
+                  webView.webChromeClient = object : WebChromeClient() {
+                      override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                          if (newProgress < 100) {
+                              progressBar.visibility = View.VISIBLE
+                              progressBar.progress = newProgress
+                          } else {
+                              progressBar.visibility = View.GONE
+                          }
+                      }
+                  }
+              }
+
+              private fun setupButtons() {
+                  btnReload.setOnClickListener { webView.reload() }
+                  btnExitExam.setOnClickListener { showProctorExitDialog() }
+                  btnResumeExam.setOnClickListener {
+                      securityOverlay.visibility = View.GONE
+                      hideSystemBars()
+                      activateScreenPinning()
+                  }
+              }
+
+              private fun activateScreenPinning() {
+                  try {
+                      if (!isAppPinned()) {
+                          startLockTask()
+                      }
+                  } catch (_: Exception) {
+                  }
+                  updateLockStatusIndicator()
+              }
+
+              private fun isAppPinned(): Boolean {
+                  val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                  return am.lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE
+              }
+
+              private fun updateLockStatusIndicator() {
+                  if (isAppPinned()) {
+                      tvLockStatus.text = "🔒 TERKUNCI (NOTIFIKASI & HOME MATI)"
+                      tvLockStatus.setTextColor(0xFF34D399.toInt())
+                  } else {
+                      tvLockStatus.text = "⚠️ MODE STANDAR (KLIK KUNCI LAYAR)"
+                      tvLockStatus.setTextColor(0xFFFBBF24.toInt())
+                  }
+              }
+
+              override fun onResume() {
+                  super.onResume()
+                  hideSystemBars()
+                  updateLockStatusIndicator()
+                  if (!isAuthorizedExit && !DEFAULT_EXAM_URL.contains("GANTI-DENGAN-LINK-NETLIFY-KAMU")) {
+                      if (!isAppPinned()) {
+                          activateScreenPinning()
+                      }
+                  }
+              }
+
+              override fun onWindowFocusChanged(hasFocus: Boolean) {
+                  super.onWindowFocusChanged(hasFocus)
+                  if (hasFocus) {
+                      hideSystemBars()
+                      updateLockStatusIndicator()
+                  } else if (!isAuthorizedExit) {
+                      playWarningBeep()
+                      tvOverlayMessage.text =
+                          "Terdeteksi gangguan fokus layar (notifikasi melayang, split-screen, atau kunci layar dilepas).\n\nTekan tombol di bawah untuk mengunci kembali layar ujian."
+                      securityOverlay.visibility = View.VISIBLE
+                  }
+              }
+
+              private fun hideSystemBars() {
+                  WindowCompat.setDecorFitsSystemWindows(window, false)
+                  val controller = WindowInsetsControllerCompat(window, window.decorView)
+                  controller.hide(WindowInsetsCompat.Type.systemBars())
+                  controller.systemBarsBehavior =
+                      WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+              }
+
+              private fun playWarningBeep() {
+                  try {
+                      val toneGen = ToneGenerator(AudioManager.STREAM_ALARM, 100)
+                      toneGen.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 400)
+                  } catch (_: Exception) {
+                  }
+              }
+
+              private fun showInitialUrlSetupDialog() {
+                  val input = EditText(this).apply {
+                      hint = "https://ujian-sekolahmu.netlify.app"
+                      inputType = InputType.TYPE_TEXT_VARIATION_URI
+                  }
+
+                  AlertDialog.Builder(this)
+                      .setTitle("Pengaturan Awal Exam Browser")
+                      .setMessage("Masukkan alamat link website CBT sekolah Anda (Netlify):")
+                      .setView(input)
+                      .setCancelable(false)
+                      .setPositiveButton("Simpan & Mulai") { _, _ ->
+                          var url = input.text.toString().trim()
+                          if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                              url = "https://$url"
+                          }
+                          getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                              .edit()
+                              .putString(KEY_SAVED_URL, url)
+                              .apply()
+
+                          activeExamUrl = url
+                          startExamSession()
+                      }
+                      .show()
+              }
+
+              private fun showProctorExitDialog() {
+                  val pinInput = EditText(this).apply {
+                      hint = "Masukkan PIN Pengawas"
+                      inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+                  }
+
+                  AlertDialog.Builder(this)
+                      .setTitle("Verifikasi Pengawas Ruang")
+                      .setMessage("Masukkan PIN Pengawas untuk mengakhiri sesi Exam Browser:")
+                      .setView(pinInput)
+                      .setPositiveButton("Keluar Aplikasi") { _, _ ->
+                          val enteredPin = pinInput.text.toString().trim()
+                          if (enteredPin == PROCTOR_EXIT_PIN) {
+                              isAuthorizedExit = true
+                              try {
+                                  stopLockTask()
+                              } catch (_: Exception) {
+                              }
+                              finishAndRemoveTask()
+                          } else {
+                              playWarningBeep()
+                              Toast.makeText(
+                                  this,
+                                  "PIN Pengawas salah! Akses keluar ditolak.",
+                                  Toast.LENGTH_LONG
+                              ).show()
+                          }
+                      }
+                      .setNeutralButton("Ganti Link Ujian") { _, _ ->
+                          val enteredPin = pinInput.text.toString().trim()
+                          if (enteredPin == PROCTOR_EXIT_PIN) {
+                              showInitialUrlSetupDialog()
+                          } else {
+                              Toast.makeText(this, "PIN Pengawas salah!", Toast.LENGTH_SHORT).show()
+                          }
+                      }
+                      .setNegativeButton("Batal", null)
+                      .show()
+              }
+          }
+          EOF
+          fi
+
+          sed -i "s|https://GANTI-DENGAN-LINK-NETLIFY-KAMU.netlify.app|${EXAM_URL}|g" app/src/main/java/id/sch/edushield/exambrowser/MainActivity.kt
+          sed -i "s|\"202699\"|\"${EXIT_PIN}\"|g" app/src/main/java/id/sch/edushield/exambrowser/MainActivity.kt
 
       - name: Build Debug APK
-        run: |
-          if [ -f "EduShield-ExamBrowser/build.gradle.kts" ]; then
-            cd EduShield-ExamBrowser
-          fi
-          gradle assembleDebug
+        run: gradle assembleDebug
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: EduShield-ExamBrowser-APK
-          path: "**/app/build/outputs/apk/debug/app-debug.apk"
+          path: app/build/outputs/apk/debug/app-debug.apk
