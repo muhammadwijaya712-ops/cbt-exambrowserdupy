@@ -6,33 +6,38 @@ on:
   workflow_dispatch:
 
 env:
-  EXAM_URL: "https://GANTI-DENGAN-LINK-NETLIFY-KAMU.netlify.app"
-  EXIT_PIN: "202699"
+  EXAM_URL: "https://cbt-smpn2piyungan.netlify.app/"
+  EXIT_PIN: "20400362"
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
 
-      - name: Generate Struktur Proyek Android Lengkap
+      - name: Siapkan Android SDK & Lisensi
         run: |
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "sdk.dir=$SDK_ROOT" > local.properties
+          yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+          "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Generate Proyek Android Lengkap
+        run: |
+          rm -rf app/src/main/res/mipmap* app/src/main/res/drawable/*
           mkdir -p app/src/main/java/id/sch/edushield/exambrowser
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
@@ -305,10 +310,7 @@ jobs:
           </LinearLayout>
           EOF
 
-          if [ -f "EduShield-ExamBrowser/app/src/main/java/id/sch/edushield/exambrowser/MainActivity.kt" ]; then
-            cp "EduShield-ExamBrowser/app/src/main/java/id/sch/edushield/exambrowser/MainActivity.kt" app/src/main/java/id/sch/edushield/exambrowser/MainActivity.kt
-          elif [ ! -f "app/src/main/java/id/sch/edushield/exambrowser/MainActivity.kt" ]; then
-            cat << 'EOF' > app/src/main/java/id/sch/edushield/exambrowser/MainActivity.kt
+          cat << 'EOF' > app/src/main/java/id/sch/edushield/exambrowser/MainActivity.kt
           package id.sch.edushield.exambrowser
 
           import android.annotation.SuppressLint
@@ -614,13 +616,12 @@ jobs:
               }
           }
           EOF
-          fi
 
           sed -i "s|https://GANTI-DENGAN-LINK-NETLIFY-KAMU.netlify.app|${EXAM_URL}|g" app/src/main/java/id/sch/edushield/exambrowser/MainActivity.kt
           sed -i "s|\"202699\"|\"${EXIT_PIN}\"|g" app/src/main/java/id/sch/edushield/exambrowser/MainActivity.kt
 
       - name: Build Debug APK
-        run: gradle assembleDebug
+        run: gradle assembleDebug --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
